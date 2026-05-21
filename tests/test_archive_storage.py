@@ -11,17 +11,21 @@ from archive_model import SottoVarianteRecord, TitoloRecord
 from archive_storage import (
     ARCHIVE_STORAGE_SCHEMA_VERSION,
     ArchiveStorageConfirmationError,
+    ArchiveStorageMutationError,
     ArchiveStorageShapeError,
     ArchiveStorageVersionError,
     build_active_local_archive_storage,
     build_empty_local_archive_storage,
     clear_pending_import,
+    create_title_record,
     deserialize_local_archive_storage,
     has_active_archive,
     requires_overwrite_confirmation,
     resolve_pending_import_overwrite,
     serialize_local_archive_storage,
     stage_pending_import,
+    update_sub_variant_record,
+    update_title_record,
 )
 
 
@@ -198,6 +202,98 @@ class LocalArchiveStorageTests(unittest.TestCase):
                 build_empty_local_archive_storage(),
                 confirmed=True,
                 resolved_at=datetime(2026, 5, 21, 16, 0, 0),
+            )
+
+    def test_updates_title_record_and_refreshes_metadata_timestamp(self) -> None:
+        storage = build_active_local_archive_storage(
+            (_sample_title("Chrono Trigger"),),
+            activated_at=datetime(2026, 5, 21, 14, 0, 0),
+        )
+
+        updated = update_title_record(
+            storage,
+            existing_title="Chrono Trigger",
+            updated_title=_sample_title("Chrono Trigger DS"),
+            updated_at=datetime(2026, 5, 21, 17, 0, 0),
+        )
+
+        self.assertEqual(tuple(title.titolo for title in updated.active_titles), ("Chrono Trigger DS",))
+        self.assertEqual(updated.metadata.numero_record, 1)
+        self.assertEqual(updated.metadata.ultima_modifica_locale, datetime(2026, 5, 21, 17, 0, 0))
+
+    def test_updates_sub_variant_without_breaking_required_fields_contract(self) -> None:
+        storage = build_active_local_archive_storage(
+            (_sample_title("Chrono Trigger"),),
+            activated_at=datetime(2026, 5, 21, 14, 0, 0),
+        )
+
+        updated = update_sub_variant_record(
+            storage,
+            title="Chrono Trigger",
+            variant_index=0,
+            updated_variant=SottoVarianteRecord(
+                piattaforma="Nintendo DS",
+                edizione_versione="Remaster",
+                supporto="cartuccia",
+                stato="Da comprare",
+            ),
+            updated_at=datetime(2026, 5, 21, 17, 30, 0),
+        )
+
+        variant = updated.active_titles[0].sotto_varianti[0]
+        self.assertEqual(variant.piattaforma, "Nintendo DS")
+        self.assertEqual(variant.stato, "Da comprare")
+        self.assertEqual(updated.metadata.ultima_modifica_locale, datetime(2026, 5, 21, 17, 30, 0))
+
+    def test_creates_new_title_and_increments_record_count(self) -> None:
+        storage = build_active_local_archive_storage(
+            (_sample_title("Chrono Trigger"),),
+            activated_at=datetime(2026, 5, 21, 14, 0, 0),
+        )
+
+        created = create_title_record(
+            storage,
+            new_title=_sample_title("Terranigma"),
+            created_at=datetime(2026, 5, 21, 18, 0, 0),
+        )
+
+        self.assertEqual(
+            tuple(title.titolo for title in created.active_titles),
+            ("Chrono Trigger", "Terranigma"),
+        )
+        self.assertEqual(created.metadata.numero_record, 2)
+        self.assertEqual(created.metadata.ultima_modifica_locale, datetime(2026, 5, 21, 18, 0, 0))
+
+    def test_create_can_activate_first_title_from_empty_storage(self) -> None:
+        created = create_title_record(
+            build_empty_local_archive_storage(),
+            new_title=_sample_title("Chrono Trigger"),
+            created_at=datetime(2026, 5, 21, 18, 30, 0),
+        )
+
+        self.assertTrue(created.metadata.archivio_attivo)
+        self.assertEqual(created.metadata.numero_record, 1)
+        self.assertEqual(tuple(title.titolo for title in created.active_titles), ("Chrono Trigger",))
+
+    def test_rejects_duplicate_title_creation_and_missing_update_targets(self) -> None:
+        storage = build_active_local_archive_storage(
+            (_sample_title("Chrono Trigger"),),
+            activated_at=datetime(2026, 5, 21, 14, 0, 0),
+        )
+
+        with self.assertRaisesRegex(ArchiveStorageMutationError, "already exists"):
+            create_title_record(
+                storage,
+                new_title=_sample_title("Chrono Trigger"),
+                created_at=datetime(2026, 5, 21, 18, 0, 0),
+            )
+
+        with self.assertRaisesRegex(ArchiveStorageMutationError, "was not found"):
+            update_title_record(
+                storage,
+                existing_title="Terranigma",
+                updated_title=_sample_title("Terranigma"),
+                updated_at=datetime(2026, 5, 21, 18, 15, 0),
             )
 
 

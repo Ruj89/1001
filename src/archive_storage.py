@@ -25,6 +25,10 @@ class ArchiveStorageConfirmationError(ArchiveStorageError):
     """Raised when overwrite activation is requested without a staged import."""
 
 
+class ArchiveStorageMutationError(ArchiveStorageError):
+    """Raised when a create or update operation cannot be applied safely."""
+
+
 @dataclass(frozen=True, slots=True, init=False)
 class PendingImportRecord:
     """Transient import candidate kept separate from the active archive."""
@@ -199,6 +203,81 @@ def resolve_pending_import_overwrite(
         ),
         pending_import=None,
     )
+
+
+def update_title_record(
+    storage: LocalArchiveStorage,
+    *,
+    existing_title: str,
+    updated_title: TitoloRecord,
+    updated_at: datetime,
+) -> LocalArchiveStorage:
+    normalized_existing_title = existing_title.strip()
+    if not normalized_existing_title:
+        raise ValueError("existing_title must be a non-blank string")
+    if not isinstance(updated_title, TitoloRecord):
+        raise TypeError("updated_title must be a TitoloRecord")
+
+    current_titles = list(_require_active_titles(storage))
+    target_index = _find_title_index(current_titles, normalized_existing_title)
+    _ensure_no_duplicate_title(
+        current_titles,
+        candidate_title=updated_title.titolo,
+        ignored_index=target_index,
+    )
+    current_titles[target_index] = updated_title
+    return _rebuild_active_storage(storage, current_titles, updated_at=updated_at)
+
+
+def update_sub_variant_record(
+    storage: LocalArchiveStorage,
+    *,
+    title: str,
+    variant_index: int,
+    updated_variant: SottoVarianteRecord,
+    updated_at: datetime,
+) -> LocalArchiveStorage:
+    normalized_title = title.strip()
+    if not normalized_title:
+        raise ValueError("title must be a non-blank string")
+    if not isinstance(variant_index, int):
+        raise TypeError("variant_index must be an int")
+    if variant_index < 0:
+        raise ValueError("variant_index must be zero or greater")
+    if not isinstance(updated_variant, SottoVarianteRecord):
+        raise TypeError("updated_variant must be a SottoVarianteRecord")
+
+    current_titles = list(_require_active_titles(storage))
+    target_index = _find_title_index(current_titles, normalized_title)
+    target_title = current_titles[target_index]
+
+    if variant_index >= len(target_title.sotto_varianti):
+        raise ArchiveStorageMutationError(
+            f"variant_index {variant_index} is out of range for title {target_title.titolo!r}"
+        )
+
+    updated_variants = list(target_title.sotto_varianti)
+    updated_variants[variant_index] = updated_variant
+    current_titles[target_index] = TitoloRecord(
+        titolo=target_title.titolo,
+        sotto_varianti=tuple(updated_variants),
+    )
+    return _rebuild_active_storage(storage, current_titles, updated_at=updated_at)
+
+
+def create_title_record(
+    storage: LocalArchiveStorage,
+    *,
+    new_title: TitoloRecord,
+    created_at: datetime,
+) -> LocalArchiveStorage:
+    if not isinstance(new_title, TitoloRecord):
+        raise TypeError("new_title must be a TitoloRecord")
+
+    current_titles = list(storage.active_titles)
+    _ensure_no_duplicate_title(current_titles, candidate_title=new_title.titolo, ignored_index=None)
+    current_titles.append(new_title)
+    return _rebuild_active_storage(storage, current_titles, updated_at=created_at)
 
 
 def serialize_local_archive_storage(storage: LocalArchiveStorage) -> dict[str, object]:
@@ -398,3 +477,58 @@ def _parse_datetime(value: str, *, context: str) -> datetime:
         return datetime.fromisoformat(value)
     except ValueError as exc:
         raise ArchiveStorageShapeError(f"{context} must be a valid ISO datetime string") from exc
+
+
+def _require_active_titles(storage: LocalArchiveStorage) -> tuple[TitoloRecord, ...]:
+    if not storage.metadata.archivio_attivo:
+        raise ArchiveStorageMutationError("cannot mutate titles when no active archive exists")
+    return storage.active_titles
+
+
+def _find_title_index(
+    titles: list[TitoloRecord],
+    normalized_title: str,
+) -> int:
+    for index, title in enumerate(titles):
+        if title.titolo == normalized_title:
+            return index
+    raise ArchiveStorageMutationError(f"title {normalized_title!r} was not found in active archive")
+
+
+def _ensure_no_duplicate_title(
+    titles: list[TitoloRecord],
+    *,
+    candidate_title: str,
+    ignored_index: int | None,
+) -> None:
+    for index, title in enumerate(titles):
+        if ignored_index is not None and index == ignored_index:
+            continue
+        if title.titolo == candidate_title:
+            raise ArchiveStorageMutationError(
+                f"title {candidate_title!r} already exists in active archive"
+            )
+
+
+def _rebuild_active_storage(
+    storage: LocalArchiveStorage,
+    titles: list[TitoloRecord],
+    *,
+    updated_at: datetime,
+) -> LocalArchiveStorage:
+    if not isinstance(updated_at, datetime):
+        raise TypeError("updated_at must be a datetime")
+    if not titles:
+        raise ArchiveStorageMutationError("active archive writes must preserve at least one title")
+
+    return LocalArchiveStorage(
+        schema_version=storage.schema_version,
+        active_titles=tuple(titles),
+        metadata=ArchiveMetadataRecord(
+            archivio_attivo=True,
+            numero_record=len(titles),
+            ultima_modifica_locale=updated_at,
+            versione_schema=storage.schema_version,
+        ),
+        pending_import=storage.pending_import,
+    )

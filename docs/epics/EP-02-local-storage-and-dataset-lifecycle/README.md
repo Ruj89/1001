@@ -1,6 +1,6 @@
 # EP-02 Local storage and dataset lifecycle
 
-Status: `proposed`
+Status: `completed`
 
 Objective: Definire il backlog minimo per persistenza locale, versionamento schema, attivazione dataset e gestione sicura dell'overwrite da import.
 
