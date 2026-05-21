@@ -21,6 +21,10 @@ class ArchiveStorageShapeError(ArchiveStorageError):
     """Raised when a persisted payload violates the storage contract."""
 
 
+class ArchiveStorageConfirmationError(ArchiveStorageError):
+    """Raised when overwrite activation is requested without a staged import."""
+
+
 @dataclass(frozen=True, slots=True, init=False)
 class PendingImportRecord:
     """Transient import candidate kept separate from the active archive."""
@@ -154,6 +158,45 @@ def clear_pending_import(storage: LocalArchiveStorage) -> LocalArchiveStorage:
         schema_version=storage.schema_version,
         active_titles=storage.active_titles,
         metadata=storage.metadata,
+        pending_import=None,
+    )
+
+
+def has_active_archive(storage: LocalArchiveStorage) -> bool:
+    return storage.metadata.archivio_attivo
+
+
+def requires_overwrite_confirmation(storage: LocalArchiveStorage) -> bool:
+    return has_active_archive(storage)
+
+
+def resolve_pending_import_overwrite(
+    storage: LocalArchiveStorage,
+    *,
+    confirmed: bool,
+    resolved_at: datetime,
+) -> LocalArchiveStorage:
+    if storage.pending_import is None:
+        raise ArchiveStorageConfirmationError(
+            "cannot resolve overwrite without a staged pending import"
+        )
+    if not isinstance(confirmed, bool):
+        raise TypeError("confirmed must be a bool")
+    if not isinstance(resolved_at, datetime):
+        raise TypeError("resolved_at must be a datetime")
+
+    if not confirmed:
+        return clear_pending_import(storage)
+
+    return LocalArchiveStorage(
+        schema_version=storage.schema_version,
+        active_titles=storage.pending_import.titoli,
+        metadata=ArchiveMetadataRecord(
+            archivio_attivo=True,
+            numero_record=len(storage.pending_import.titoli),
+            ultima_modifica_locale=resolved_at,
+            versione_schema=storage.schema_version,
+        ),
         pending_import=None,
     )
 

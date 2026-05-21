@@ -10,12 +10,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from archive_model import SottoVarianteRecord, TitoloRecord
 from archive_storage import (
     ARCHIVE_STORAGE_SCHEMA_VERSION,
+    ArchiveStorageConfirmationError,
     ArchiveStorageShapeError,
     ArchiveStorageVersionError,
     build_active_local_archive_storage,
     build_empty_local_archive_storage,
     clear_pending_import,
     deserialize_local_archive_storage,
+    has_active_archive,
+    requires_overwrite_confirmation,
+    resolve_pending_import_overwrite,
     serialize_local_archive_storage,
     stage_pending_import,
 )
@@ -77,6 +81,8 @@ class LocalArchiveStorageTests(unittest.TestCase):
             tuple(title.titolo for title in staged_storage.pending_import.titoli),
             ("Final Fantasy VI",),
         )
+        self.assertTrue(has_active_archive(staged_storage))
+        self.assertTrue(requires_overwrite_confirmation(staged_storage))
 
     def test_serialization_round_trip_preserves_active_and_pending_state(self) -> None:
         storage = stage_pending_import(
@@ -137,6 +143,62 @@ class LocalArchiveStorageTests(unittest.TestCase):
         self.assertIsNone(cleared.pending_import)
         self.assertEqual(cleared.active_titles, storage.active_titles)
         self.assertEqual(cleared.metadata, storage.metadata)
+
+    def test_confirmation_activates_pending_import_atomically(self) -> None:
+        staged_storage = stage_pending_import(
+            build_active_local_archive_storage(
+                (_sample_title("Chrono Trigger"),),
+                activated_at=datetime(2026, 5, 21, 14, 0, 0),
+            ),
+            source_name="incoming.ods",
+            titoli=(_sample_title("Final Fantasy VI"), _sample_title("Terranigma")),
+            staged_at=datetime(2026, 5, 21, 15, 0, 0),
+        )
+
+        activated = resolve_pending_import_overwrite(
+            staged_storage,
+            confirmed=True,
+            resolved_at=datetime(2026, 5, 21, 16, 0, 0),
+        )
+
+        self.assertEqual(
+            tuple(title.titolo for title in activated.active_titles),
+            ("Final Fantasy VI", "Terranigma"),
+        )
+        self.assertEqual(activated.metadata.numero_record, 2)
+        self.assertIsNone(activated.pending_import)
+
+    def test_cancel_keeps_previous_active_archive_and_discards_pending_import(self) -> None:
+        staged_storage = stage_pending_import(
+            build_active_local_archive_storage(
+                (_sample_title("Chrono Trigger"),),
+                activated_at=datetime(2026, 5, 21, 14, 0, 0),
+            ),
+            source_name="incoming.ods",
+            titoli=(_sample_title("Final Fantasy VI"),),
+            staged_at=datetime(2026, 5, 21, 15, 0, 0),
+        )
+
+        cancelled = resolve_pending_import_overwrite(
+            staged_storage,
+            confirmed=False,
+            resolved_at=datetime(2026, 5, 21, 16, 0, 0),
+        )
+
+        self.assertEqual(
+            tuple(title.titolo for title in cancelled.active_titles),
+            ("Chrono Trigger",),
+        )
+        self.assertIsNone(cancelled.pending_import)
+        self.assertEqual(cancelled.metadata, staged_storage.metadata)
+
+    def test_rejects_overwrite_resolution_without_pending_import(self) -> None:
+        with self.assertRaisesRegex(ArchiveStorageConfirmationError, "staged pending import"):
+            resolve_pending_import_overwrite(
+                build_empty_local_archive_storage(),
+                confirmed=True,
+                resolved_at=datetime(2026, 5, 21, 16, 0, 0),
+            )
 
 
 if __name__ == "__main__":
