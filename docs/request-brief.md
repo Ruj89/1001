@@ -11,10 +11,19 @@ L'utente primario e' il proprietario dell'archivio, che usa principalmente Andro
 Il processo attuale, per quanto inferibile dal file, e' questo:
 - consultazione del foglio `Lista` come base operativa principale;
 - uso di stati sintetici come `OK`, `Da comprare`, `Da studiare estrazione e comprare`, `Non reperibile`;
-- utilizzo del foglio `Risultati` come riepilogo di copertura tra elementi presenti e mancanti;
-- utilizzo del foglio `Appoggio` come derivazione semplificata di titolo + stato.
+- utilizzo del foglio `Risultati` come riepilogo di copertura tra elementi presenti e mancanti, derivato dal primo foglio;
+- utilizzo del foglio `Appoggio` come derivazione semplificata di titolo + stato, anch'essa derivata dal primo foglio.
 
-Inferenza: la stessa opera logica puo' comparire su piu' righe, probabilmente per piattaforma, edizione, supporto o stato diverso, quindi il processo reale non e' una semplice lista piatta di titoli univoci.
+Inferenza confermata dal file: la stessa opera logica puo' comparire su piu' righe per piattaforma, edizione, supporto o stato diverso. Per il brief aggiornato, l'unita' di business da trattare nell'MVP non e' una riga piatta autonoma, ma un `titolo` che puo' contenere una o piu' `sotto-varianti`.
+
+Per il perimetro MVP, il primo foglio viene interpretato con questo contratto stabile di colonne:
+- `titolo`
+- `piattaforma`
+- `edizione/versione`
+- `supporto`
+- `stato`
+
+Le righe che condividono lo stesso titolo appartengono allo stesso record logico e restano separate come sotto-varianti distinte, senza consolidamento automatico aggressivo.
 
 3. Valore atteso
 
@@ -31,7 +40,7 @@ L'urgenza e' concreta ma non legata a una scadenza esterna: il limite attuale bl
 
 5. Scope minimo del cambiamento
 
-Lo scope minimo sensato non e' "modificare l'ODS in modo piu' comodo", ma introdurre una PWA offline-first che usi storage locale strutturato e tratti `1001.ods` come sorgente di migrazione iniziale. La prima versione deve consentire import iniziale dei dati, consultazione rapida, ricerca, filtri base, dettaglio record, modifica locale e backup/export in un formato piu' adatto come JSON.
+Lo scope minimo sensato non e' "modificare l'ODS in modo piu' comodo", ma introdurre una PWA offline-first che usi storage locale strutturato e tratti un file ODS del formato atteso come input e output operativo. La prima versione deve consentire import del primo foglio ODS, trasformazione nel modello `titolo + sotto-varianti`, sostituzione completa dell'archivio locale previa conferma utente, consultazione rapida, ricerca, filtri base, dettaglio record, modifica locale, rigenerazione programmatica delle viste derivate minime ed export finale in ODS ad alta fedelta' operativa rispetto al file attuale.
 
 6. Incluso / Escluso
 
@@ -40,10 +49,15 @@ Incluso:
 - definizione di un modello dati applicativo piu' adatto del foglio ODS;
 - PWA installabile con uso offline-first;
 - storage operativo locale nel browser;
+- import di un file ODS con dati variabili nel primo foglio;
+- sostituzione completa del dataset locale a ogni nuovo import, con conferma esplicita prima della sovrascrittura;
+- modello dati applicativo basato su `titolo` con una o piu' `sotto-varianti`;
 - ricerca testuale e filtri base;
 - visualizzazione elenco e dettaglio record;
 - modifica e inserimento record;
-- export di backup in JSON;
+- rigenerazione programmatica di una vista equivalente a `Appoggio` come proiezione semplificata `titolo + stato`;
+- rigenerazione programmatica di una vista equivalente a `Risultati` come riepilogo essenziale presente/mancante;
+- export in ODS di un file quasi identico a `1001.ods` sul piano operativo, con foglio principale e viste derivate equivalenti;
 - schermata di stato archivio con metriche essenziali.
 
 Escluso:
@@ -51,46 +65,54 @@ Escluso:
 - scrittura in-place del file aperto da cloud o filesystem Android;
 - sincronizzazione automatica multi-dispositivo nel MVP;
 - collaborazione multiutente;
-- round-trip completo ODS -> app -> ODS come vincolo iniziale;
+- merge tra import multipli o aggiornamento incrementale del dataset locale;
+- deduplicazione fuzzy o consolidamento automatico di righe simili oltre al raggruppamento per titolo;
+- round-trip perfetto cella-per-cella o formula-per-formula come vincolo iniziale;
 - allegati, foto, storico avanzato, undo o conflitti nel primo rilascio;
 - modellazione definitiva di tutte le eccezioni prima di una profilazione piu' profonda dei dati.
 
 7. Criteri di accettazione
 
-- L'utente puo' importare una versione normalizzata dei dati derivati da `1001.ods` senza dipendere da una connessione attiva.
+- L'utente puo' importare un file ODS del formato atteso senza dipendere da una connessione attiva.
+- Prima della sostituzione dell'archivio locale con un nuovo import ODS, l'app richiede una conferma esplicita.
+- Le righe con lo stesso titolo nel primo foglio vengono importate come un singolo record `titolo` con sotto-varianti distinte.
 - L'utente puo' consultare localmente l'archivio da Android in una UI mobile-first senza dover usare un foglio di calcolo.
 - L'utente puo' cercare per titolo e applicare almeno filtri base sugli stati principali.
 - L'utente puo' aprire il dettaglio di un record e modificarne i campi previsti dal modello MVP.
 - L'utente puo' creare un nuovo record localmente.
 - L'app conserva i dati in storage locale persistente e continua a funzionare offline.
-- L'utente puo' esportare un backup JSON aggiornato dell'archivio.
+- L'app rigenera programmaticamente una vista equivalente a `Appoggio` come proiezione `titolo + stato sintetico`, senza usare le formule del file sorgente come motore logico interno.
+- L'app rigenera programmaticamente una vista equivalente a `Risultati` come riepilogo essenziale presente/mancante a livello titolo.
+- L'utente puo' esportare un ODS aggiornato dell'archivio, con struttura, organizzazione e usabilita' operativa molto vicine al file attuale.
 - L'app espone uno stato dati minimo con archivio attivo, numero record, ultima modifica locale e versione schema.
 
 8. Dubbi o punti aperti
 
-- I nomi semantici esatti delle colonne di `Lista` non sono ancora confermati: il file mostra 5 colonne effettive, ma il loro significato va validato.
-- Non e' ancora chiaro se il record primario debba rappresentare un titolo, una variante per piattaforma o una copia/supporto specifico.
-- Il foglio `Risultati` sembra essere un riepilogo derivato, ma va confermato se contiene logiche da preservare nell'app.
-- Il foglio `Appoggio` sembra una proiezione titolo + stato, ma va chiarito se serve solo come supporto temporaneo o se riflette una vista di business stabile.
-- Non e' ancora definita la strategia con cui deduplicare o collegare titoli ripetuti su piu' righe.
-- Non e' ancora deciso se l'import iniziale debba passare da JSON normalizzato o da una conversione automatica piu' diretta dell'ODS.
+- Le 5 colonne del foglio `Lista` vengono trattate come contratto stabile `titolo`, `piattaforma`, `edizione/versione`, `supporto`, `stato`; resta da verificare solo se emergano anomalie dati future che richiedano eccezioni.
+- Il record primario dell'MVP e' `titolo con sotto-varianti`; resta da definire con precisione quali campi siano sempre obbligatori in ciascuna sotto-variante.
+- `Risultati` e `Appoggio` non sono sorgenti da importare: resta da chiarire il criterio esatto con cui sintetizzare lo stato di `Appoggio` e la copertura presente/mancante di `Risultati`.
+- I titoli ripetuti vengono collegati allo stesso record titolo e mantenuti come sotto-varianti distinte; resta da definire l'ordinamento minimo da preservare tra sotto-varianti.
+- L'ODS in uscita deve risultare quasi identico sul piano operativo; resta da chiarire fino a che punto la fedelta' debba includere ordinamento, layout e formule oltre alla sola struttura logica.
 
 9. Impatti da validare con il team tecnico
 
 - Modellazione dati: definire l'entita' primaria corretta e distinguere tra titolo, piattaforma, formato, stato e note.
-- Migrazione: progettare un processo affidabile di estrazione e normalizzazione da `1001.ods`.
+- Contratto di import: fissare il mapping stabile tra le 5 colonne del primo foglio e il modello `titolo + sotto-varianti`.
+- Migrazione: progettare un processo affidabile di estrazione e normalizzazione dal primo foglio di un ODS del formato atteso.
 - Qualita' dati: identificare valori incoerenti, duplicati, stati sovrapposti e campi impliciti.
 - Storage locale: confermare IndexedDB come sorgente operativa e definire strategia di versionamento schema.
+- Import/export ODS: verificare la fattibilita' di parsing del primo foglio e di generazione di un ODS in uscita molto simile al file attuale.
+- Overwrite operativo: definire il comportamento sicuro di sostituzione completa dell'archivio locale a ogni import.
+- Elaborazioni derivate: definire il criterio minimo di stato sintetico per `Appoggio` e di copertura presente/mancante per `Risultati`.
 - Prestazioni: verificare resa su Android con archivio di dimensione simile o superiore a quello attuale.
-- Backup e ripristino: definire formato, frequenza d'uso e sicurezza del flusso export/import.
 - UX mobile: verificare che la navigazione e l'editing dei record siano realmente piu' rapidi del foglio.
-- Evoluzione futura: valutare se lasciare spazio a CSV, ODS export secondario, SQLite o wrapper nativo in fasi successive.
+- Evoluzione futura: valutare se lasciare spazio a formati secondari, sync o wrapper nativo in fasi successive.
 
 10. Raccomandazione
 
 `Ridurre`
 
-Rationale: l'intento e' valido e il valore e' chiaro, ma la soluzione va ridotta a un MVP molto stretto. La richiesta non deve essere interpretata come "replicare il foglio in una web app", ma come costruire un primo archivio locale offline-first che copra solo il flusso essenziale: import, consultazione, ricerca, modifica base ed export JSON. Prima di qualsiasi estensione serve validare il modello dati reale che emerge da `1001.ods`.
+Rationale: l'intento e' valido e il valore e' chiaro, ma la soluzione va ridotta a un MVP molto stretto. La richiesta non deve essere interpretata come "replicare il foglio in una web app", ma come costruire un primo archivio locale offline-first che copra solo il flusso essenziale: import ODS con sostituzione completa, modello `titolo + sotto-varianti`, consultazione, ricerca, modifica base, rigenerazione programmatica delle elaborazioni minime utili ed export finale in ODS ad alta fedelta' operativa. Prima di qualsiasi estensione serve validare il modello dati reale che emerge dal primo foglio del file.
 
 Stato validazione interna
 
