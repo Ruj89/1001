@@ -1,6 +1,6 @@
 # EP-04 Derived views and ODS export
 
-Status: `proposed`
+Status: `completed`
 
 Objective: Definire il backlog minimo per rigenerare `Appoggio` e `Risultati` dal dataset locale e produrre un ODS operativo coerente con il perimetro MVP.
 
