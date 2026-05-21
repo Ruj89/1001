@@ -13,6 +13,10 @@ class ListaTitleFillDownError(ListaNormalizationError):
     """Raised when a blank title appears before any fill-down context exists."""
 
 
+class ListaRowShapeError(ListaNormalizationError):
+    """Raised when a raw Lista row does not match the required 5-column shape."""
+
+
 @dataclass(frozen=True, slots=True)
 class NormalizedListaRow:
     """One raw Lista row with an effective title resolved for later grouping."""
@@ -45,6 +49,10 @@ def normalize_lista_rows(lista_rows: tuple[RawListaRow, ...]) -> NormalizedLista
     previous_title: str | None = None
 
     for source_row_index, raw_row in enumerate(lista_rows):
+        if len(raw_row) != 5:
+            raise ListaRowShapeError(
+                f"Row {source_row_index + 1} must contain exactly 5 columns; found {len(raw_row)}"
+            )
         titolo, piattaforma, edizione_versione, supporto, stato = raw_row
         normalized_title = titolo.strip()
 

@@ -1,6 +1,6 @@
 # EP-01 Import and domain normalization
 
-Status: `proposed`
+Status: `completed`
 
 Objective: Definire il backlog minimo per importare `Lista`, applicare fill-down, costruire il modello `Titolo + Sotto-varianti` e fissare il contratto dati MVP.
 

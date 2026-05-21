@@ -7,6 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from lista_normalizer import (  # noqa: E402
+    ListaRowShapeError,
     ListaTitleFillDownError,
     NormalizedListaDataset,
     NormalizedListaRow,
@@ -99,6 +100,14 @@ class NormalizeListaRowsTests(unittest.TestCase):
             normalize_lista_rows(
                 (
                     ("", "DOS", "Classic", "CD", "OK"),
+                )
+            )
+
+    def test_rejects_rows_that_do_not_match_the_five_column_contract(self) -> None:
+        with self.assertRaisesRegex(ListaRowShapeError, "exactly 5 columns"):
+            normalize_lista_rows(
+                (
+                    ("Alpha", "DOS", "Classic", "CD"),
                 )
             )
 

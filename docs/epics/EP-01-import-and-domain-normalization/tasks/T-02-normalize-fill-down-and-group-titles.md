@@ -1,6 +1,6 @@
 # T-02 Normalize fill-down and group titles
 
-Status: `accepted`
+Status: `completed`
 
 Objective: Definire la normalizzazione minima che trasforma le raw rows ordinate di `Lista` in gruppi normalizzati per `Titolo`, pronti per la successiva costruzione dei record dominio MVP.
 
@@ -53,7 +53,7 @@ Il grouping MVP e' strettamente per match esatto del titolo dopo fill-down e tri
 - `ST-02.1` Freeze the raw-row to normalized-row boundary. Status: `completed`
 - `ST-02.2` Apply title fill-down only on blank title positions. Status: `completed`
 - `ST-02.3` Group normalized rows by exact filled-down title and preserve source order. Status: `completed`
-- `ST-02.4` Fail explicitly on rows that violate the minimum normalization contract. Status: `accepted`
+- `ST-02.4` Fail explicitly on rows that violate the minimum normalization contract. Status: `completed`
 
 ## Subtask Details And Dependencies
 
@@ -158,7 +158,12 @@ Blocks:
 
 Status:
 
-- `accepted`
+- `completed`
+
+Evidence:
+
+- Implemented in [src/lista_normalizer.py](/root/bed-project/src/lista_normalizer.py)
+- Verified by [tests/test_lista_normalizer.py](/root/bed-project/tests/test_lista_normalizer.py)
 
 ## Downstream Task Impact
 
