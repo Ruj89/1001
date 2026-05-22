@@ -51,6 +51,7 @@ La dashboard e' la home dell'app. Deve essere il primo punto di ingresso del pro
 
 - Questo task non definisce ancora il comportamento completo di lista, filtri, dettaglio o form.
 - Questo task non richiede ancora packaging nativo Android.
+- Questo task non garantisce ancora un runtime browser-only statico deployabile via HTTPS senza dipendenze da server locale.
 - Questo task non trasforma l'app in un clone spreadsheet.
 
 ## Subtasks
@@ -143,3 +144,4 @@ Blocks:
 - `EP-03 / T-03` must open detail and edit-entry flows inside the same route/container model fixed here.
 - `EP-03 / T-04` must attach create-title entry to the primary UI defined here.
 - `EP-05 / T-02` must verify Android behavior against this dashboard-first runtime, not against a documentation-only flow.
+- `EP-06 / T-02` must treat this shell as the UI baseline to preserve while removing local HTTP runtime dependencies.

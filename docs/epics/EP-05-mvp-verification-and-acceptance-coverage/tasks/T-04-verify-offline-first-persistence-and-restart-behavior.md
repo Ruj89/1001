@@ -36,6 +36,11 @@ La copertura di verifica per persistenza e restart e' presente nel boundary stor
 - La suite deve verificare errore esplicito su schema version non supportata.
 - La suite deve verificare errore esplicito su payload persistiti malformati.
 
+### 5. Scope boundary
+
+- Questa copertura verifica persistenza e recovery del boundary dati locale.
+- Questa copertura non verifica ancora deployment HTTPS, service worker installato, prompt di installazione PWA o comportamento post-installazione su Android.
+
 ## Subtasks
 
 - `ST-04.1` Verify active archive persistence after app restart. Status: `completed`
@@ -140,3 +145,8 @@ Status:
 Evidence:
 
 - Verified by [tests/test_archive_storage.py](/root/bed-project/tests/test_archive_storage.py)
+
+## Downstream Task Impact
+
+- `EP-06 / T-03` must rely on this persistence boundary but aggiungere copertura per runtime browser-only e shell offline reale.
+- `EP-07 / T-02` must validare che la persistenza gia' verificata qui resti disponibile anche dal deployment Android effettivo.

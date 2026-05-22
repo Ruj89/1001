@@ -48,6 +48,7 @@ La verifica e' downstream rispetto a `EP-03`. Deve partire solo quando dashboard
 - Questo task non sostituisce la verifica specifica di import/export o restart behavior.
 - Questo task puo' osservare problemi di persistenza locale emersi durante i flussi mobile, ma il focus resta la verifica browse/edit/create su Android.
 - Il contratto non impone ancora un mix specifico tra test manuali e automatici, ma richiede evidenza reale su UI eseguibile.
+- Questo task non copre ancora il deployment HTTPS reale, l'installazione/salvataggio PWA da browser Android o il rilancio da artefatto pubblicato.
 
 ## Subtasks
 
@@ -166,3 +167,4 @@ Evidence:
 
 - MVP acceptance for Android browse/edit usability must rely on the evidence defined here.
 - Any later QA pass on UI regressions should reuse the readiness gate and coverage boundaries fixed in this task instead of inventing a broader mobile scope ad hoc.
+- `EP-07 / T-02` must extend this coverage to the deployed Android artifact instead of riusare soltanto la fixture locale.

@@ -11,3 +11,5 @@ Epics:
 - `EP-03` Mobile archive UI and editing flows.
 - `EP-04` Derived views and ODS export.
 - `EP-05` MVP verification and acceptance coverage.
+- `EP-06` Browser-only PWA deployment readiness.
+- `EP-07` Android release validation and fallback distribution.
