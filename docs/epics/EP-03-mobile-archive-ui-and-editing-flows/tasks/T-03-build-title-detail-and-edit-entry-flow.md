@@ -1,6 +1,6 @@
 # T-03 Build title detail and edit entry flow
 
-Status: `accepted`
+Status: `completed`
 
 Objective: Definire il contratto della vista dettaglio read-first e dell'ingresso esplicito in modifica, preservando l'ordine delle sotto-varianti e la leggibilita' dei valori legacy importati mancanti.
 
@@ -48,10 +48,10 @@ La vista e' read-first. L'editing parte solo da azione intenzionale. I campi imp
 
 ## Subtasks
 
-- `ST-03.1` Render title identity and ordered sub-variants in a read-first detail surface. Status: `accepted`
-- `ST-03.2` Show the 4 archive sub-variant fields in a scan-friendly way, including explicit missing imported values. Status: `accepted`
-- `ST-03.3` Gate editing behind an explicit user action from the detail view. Status: `accepted`
-- `ST-03.4` Keep navigation coherent when a record becomes unavailable. Status: `accepted`
+- `ST-03.1` Render title identity and ordered sub-variants in a read-first detail surface. Status: `completed`
+- `ST-03.2` Show the 4 archive sub-variant fields in a scan-friendly way, including explicit missing imported values. Status: `completed`
+- `ST-03.3` Gate editing behind an explicit user action from the detail view. Status: `completed`
+- `ST-03.4` Keep navigation coherent when a record becomes unavailable. Status: `completed`
 
 ## Subtask Details And Dependencies
 

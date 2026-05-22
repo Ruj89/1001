@@ -29,6 +29,20 @@ def _sample_title(title: str = "Chrono Trigger") -> TitoloRecord:
     )
 
 
+def _sample_title_with_blank_fields(title: str = "Puzzle Bobble") -> TitoloRecord:
+    return TitoloRecord(
+        titolo=title,
+        sotto_varianti=(
+            SottoVarianteRecord(
+                piattaforma="Neo Geo",
+                edizione_versione="",
+                supporto="",
+                stato="",
+            ),
+        ),
+    )
+
+
 class ArchiveDashboardPayloadTests(unittest.TestCase):
     def test_builds_empty_dashboard_payload_with_import_first_empty_state(self) -> None:
         payload = build_dashboard_payload(build_empty_local_archive_storage())
@@ -54,6 +68,20 @@ class ArchiveDashboardPayloadTests(unittest.TestCase):
         self.assertEqual(payload["archive"]["activeTitles"][0]["titolo"], "Chrono Trigger")
         primary_routes = [route["id"] for route in payload["app"]["routes"] if route["primary"]]
         self.assertEqual(primary_routes, ["archive"])
+
+    def test_preserves_blank_imported_fields_in_active_titles_payload(self) -> None:
+        storage = build_active_local_archive_storage(
+            (_sample_title_with_blank_fields(),),
+            activated_at=datetime(2026, 5, 22, 8, 30, 0),
+        )
+
+        payload = build_dashboard_payload(storage)
+
+        active_title = payload["archive"]["activeTitles"][0]
+        self.assertEqual(active_title["titolo"], "Puzzle Bobble")
+        self.assertEqual(active_title["sottoVarianti"][0]["edizioneVersione"], "")
+        self.assertEqual(active_title["sottoVarianti"][0]["supporto"], "")
+        self.assertEqual(active_title["sottoVarianti"][0]["stato"], "")
 
 
 class ArchiveDashboardServerTests(unittest.TestCase):

@@ -193,7 +193,9 @@ dd {
 .toolbar-copy,
 .status-shortcuts,
 .title-list,
-.status-pill-row {
+.status-pill-row,
+.detail-actions,
+.variant-list {
   display: grid;
   gap: 10px;
 }
@@ -266,6 +268,57 @@ dd {
   padding: 14px;
 }
 
+.detail-header {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.detail-header h3 {
+  font-size: 1.8rem;
+}
+
+.detail-header p {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.detail-actions {
+  grid-template-columns: repeat(2, max-content);
+  align-items: start;
+}
+
+.variant-card {
+  background: #fffdf8;
+  border: 1px solid rgba(120, 70, 36, 0.12);
+  border-radius: 20px;
+  padding: 14px;
+}
+
+.variant-card-head {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.variant-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.variant-grid div {
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(176, 74, 47, 0.05);
+}
+
+.text-link {
+  color: var(--accent-deep);
+  text-decoration: none;
+}
+
 .status-pill-row {
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
@@ -292,7 +345,9 @@ dd {
   .search-form,
   .route-grid,
   .metadata-grid,
-  .status-shortcuts {
+  .status-shortcuts,
+  .variant-grid,
+  .detail-actions {
     grid-template-columns: 1fr;
   }
 

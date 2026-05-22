@@ -28,6 +28,10 @@ function normalizeStatusLabel(statusValue) {
   return statusValue || "Stato mancante";
 }
 
+function presentFieldValue(value) {
+  return value || "Valore mancante";
+}
+
 function listStatusCounts(titles) {
   const counts = new Map();
 
@@ -220,6 +224,125 @@ function renderArchiveRoute(archive, params) {
   });
 }
 
+function renderDetailRoute(archive, params) {
+  const preview = document.querySelector("#route-preview");
+  const titleName = params.get("title") || "";
+  const title = (archive.activeTitles || []).find((entry) => entry.titolo === titleName);
+
+  if (!title) {
+    preview.innerHTML = `
+      <div class="empty-state">
+        <h3>Titolo non disponibile</h3>
+        <p>Il record richiesto non e' disponibile nel dataset locale corrente. Torna alla lista per continuare su una vista coerente.</p>
+        <a class="ghost-link" href="#/archive">Torna alla lista</a>
+      </div>
+    `;
+    return;
+  }
+
+  preview.innerHTML = `
+    <div class="detail-header">
+      <div>
+        <p class="kicker">Dettaglio titolo</p>
+        <h3>${title.titolo}</h3>
+        <p>${title.sottoVarianti.length} sotto-varianti in ordine sorgente preservato.</p>
+      </div>
+      <div class="detail-actions">
+        <a class="ghost-link" href="#/archive">Torna alla lista</a>
+        <a class="ghost-link" href="#/edit?title=${encodeURIComponent(title.titolo)}&variant=0">Modifica</a>
+      </div>
+    </div>
+    <div class="variant-list">
+      ${title.sottoVarianti
+        .map(
+          (variant, index) => `
+            <article class="variant-card">
+              <div class="variant-card-head">
+                <strong>Sotto-variante ${index + 1}</strong>
+                <a class="text-link" href="#/edit?title=${encodeURIComponent(title.titolo)}&variant=${index}">
+                  Modifica questa variante
+                </a>
+              </div>
+              <dl class="variant-grid">
+                <div>
+                  <dt>Piattaforma</dt>
+                  <dd>${presentFieldValue(variant.piattaforma)}</dd>
+                </div>
+                <div>
+                  <dt>Edizione/versione</dt>
+                  <dd>${presentFieldValue(variant.edizioneVersione)}</dd>
+                </div>
+                <div>
+                  <dt>Supporto</dt>
+                  <dd>${presentFieldValue(variant.supporto)}</dd>
+                </div>
+                <div>
+                  <dt>Stato</dt>
+                  <dd>${normalizeStatusLabel(variant.stato)}</dd>
+                </div>
+              </dl>
+            </article>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderEditEntryRoute(archive, params) {
+  const preview = document.querySelector("#route-preview");
+  const titleName = params.get("title") || "";
+  const variantIndex = Number(params.get("variant") || "0");
+  const title = (archive.activeTitles || []).find((entry) => entry.titolo === titleName);
+
+  if (!title || Number.isNaN(variantIndex) || variantIndex < 0 || variantIndex >= title.sottoVarianti.length) {
+    preview.innerHTML = `
+      <div class="empty-state">
+        <h3>Ingresso modifica non disponibile</h3>
+        <p>Il contesto di modifica non e' piu' valido. Torna al dettaglio o alla lista per ripartire da uno stato coerente.</p>
+        <a class="ghost-link" href="#/archive">Torna alla lista</a>
+      </div>
+    `;
+    return;
+  }
+
+  preview.innerHTML = `
+    <div class="detail-header">
+      <div>
+        <p class="kicker">Ingresso modifica</p>
+        <h3>${title.titolo}</h3>
+        <p>La modifica parte solo da un'azione esplicita del dettaglio. Il form persistente verra' completato nel task successivo.</p>
+      </div>
+      <div class="detail-actions">
+        <a class="ghost-link" href="#/detail?title=${encodeURIComponent(title.titolo)}">Torna al dettaglio</a>
+      </div>
+    </div>
+    <article class="variant-card">
+      <div class="variant-card-head">
+        <strong>Sotto-variante ${variantIndex + 1}</strong>
+      </div>
+      <dl class="variant-grid">
+        <div>
+          <dt>Piattaforma</dt>
+          <dd>${presentFieldValue(title.sottoVarianti[variantIndex].piattaforma)}</dd>
+        </div>
+        <div>
+          <dt>Edizione/versione</dt>
+          <dd>${presentFieldValue(title.sottoVarianti[variantIndex].edizioneVersione)}</dd>
+        </div>
+        <div>
+          <dt>Supporto</dt>
+          <dd>${presentFieldValue(title.sottoVarianti[variantIndex].supporto)}</dd>
+        </div>
+        <div>
+          <dt>Stato</dt>
+          <dd>${normalizeStatusLabel(title.sottoVarianti[variantIndex].stato)}</dd>
+        </div>
+      </dl>
+    </article>
+  `;
+}
+
 function renderPreview(appConfig, archive) {
   const preview = document.querySelector("#route-preview");
   const { routeId, params } = parseHash(state.currentRoute);
@@ -230,11 +353,32 @@ function renderPreview(appConfig, archive) {
     return;
   }
 
+  if (routeId === "detail" && archive.hasActiveArchive) {
+    renderDetailRoute(archive, params);
+    return;
+  }
+
+  if (routeId === "edit" && archive.hasActiveArchive) {
+    renderEditEntryRoute(archive, params);
+    return;
+  }
+
   if (routeId === "archive" && !archive.hasActiveArchive) {
     preview.innerHTML = `
       <div class="empty-state">
         <h3>Lista non disponibile</h3>
         <p>La superficie di browse e' pronta, ma serve prima un archivio attivo locale.</p>
+        <a class="ghost-link" href="#/import">Importa ODS</a>
+      </div>
+    `;
+    return;
+  }
+
+  if ((routeId === "detail" || routeId === "edit") && !archive.hasActiveArchive) {
+    preview.innerHTML = `
+      <div class="empty-state">
+        <h3>Dettaglio non disponibile</h3>
+        <p>Serve prima un archivio locale attivo per aprire dettaglio o modifica.</p>
         <a class="ghost-link" href="#/import">Importa ODS</a>
       </div>
     `;
