@@ -18,7 +18,7 @@ from lista_parser import load_lista_workbook  # noqa: E402
 
 
 class NormalizeListaRowsTests(unittest.TestCase):
-    def test_blank_title_inherits_previous_title_only(self) -> None:
+    def test_blank_title_and_platform_inherit_previous_filled_values(self) -> None:
         normalized = normalize_lista_rows(
             (
                 ("  The Oregon Trail  ", "DOS", "Classic", "CD", "OK"),
@@ -49,12 +49,31 @@ class NormalizeListaRowsTests(unittest.TestCase):
                 NormalizedListaRow(
                     source_row_index=1,
                     titolo="The Oregon Trail",
-                    piattaforma="",
+                    piattaforma="DOS",
                     edizione_versione="Limited Edition",
                     supporto="",
                     stato="Da studiare",
                 ),
             ),
+        )
+
+    def test_blank_platform_inherits_previous_filled_platform_without_changing_title_grouping(self) -> None:
+        normalized = normalize_lista_rows(
+            (
+                ("Alpha", "SNES", "v1", "cart", "OK"),
+                ("Alpha", "", "v2", "disk", "Wanted"),
+                ("Beta", "Mega Drive", "v1", "cart", "OK"),
+                ("", "", "v2", "disk", "Wanted"),
+            )
+        )
+
+        self.assertEqual(
+            tuple(row.piattaforma for row in normalized.title_groups[0].rows),
+            ("SNES", "SNES"),
+        )
+        self.assertEqual(
+            tuple(row.piattaforma for row in normalized.title_groups[1].rows),
+            ("Mega Drive", "Mega Drive"),
         )
 
     def test_groups_rows_by_exact_effective_title(self) -> None:

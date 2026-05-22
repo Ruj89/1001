@@ -47,6 +47,7 @@ class NormalizedListaDataset:
 def normalize_lista_rows(lista_rows: tuple[RawListaRow, ...]) -> NormalizedListaDataset:
     grouped_rows: dict[str, list[NormalizedListaRow]] = {}
     previous_title: str | None = None
+    previous_platform: str | None = None
 
     for source_row_index, raw_row in enumerate(lista_rows):
         if len(raw_row) != 5:
@@ -55,6 +56,7 @@ def normalize_lista_rows(lista_rows: tuple[RawListaRow, ...]) -> NormalizedLista
             )
         titolo, piattaforma, edizione_versione, supporto, stato = raw_row
         normalized_title = titolo.strip()
+        normalized_platform = piattaforma.strip()
 
         if normalized_title:
             effective_title = normalized_title
@@ -66,10 +68,16 @@ def normalize_lista_rows(lista_rows: tuple[RawListaRow, ...]) -> NormalizedLista
                 )
             effective_title = previous_title
 
+        if normalized_platform:
+            effective_platform = normalized_platform
+            previous_platform = normalized_platform
+        else:
+            effective_platform = previous_platform or ""
+
         normalized_row = NormalizedListaRow(
             source_row_index=source_row_index,
             titolo=effective_title,
-            piattaforma=piattaforma,
+            piattaforma=effective_platform,
             edizione_versione=edizione_versione,
             supporto=supporto,
             stato=stato,

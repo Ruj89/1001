@@ -54,16 +54,8 @@ function listStatusCounts(titles) {
   const counts = new Map();
 
   for (const title of titles) {
-    const statuses = new Set(
-      title.sottoVarianti.map((variant) => variant.stato).filter((status) => status !== ""),
-    );
-
-    for (const status of statuses) {
+    for (const status of getTitleFilterStatuses(title)) {
       counts.set(status, (counts.get(status) || 0) + 1);
-    }
-
-    if (title.sottoVarianti.some((variant) => variant.stato === "")) {
-      counts.set("", (counts.get("") || 0) + 1);
     }
   }
 
@@ -131,17 +123,18 @@ function titleMatchesFilters(title, filters) {
   if (!matchesTitle) {
     return false;
   }
+  const titleStatuses = getTitleFilterStatuses(title);
+
+  if (filters.stato) {
+    if (filters.stato === "__missing__" && !titleStatuses.includes("")) {
+      return false;
+    }
+    if (filters.stato !== "__missing__" && !titleStatuses.includes(filters.stato)) {
+      return false;
+    }
+  }
 
   return title.sottoVarianti.some((variant) => {
-    if (filters.stato) {
-      if (filters.stato === "__missing__" && variant.stato !== "") {
-        return false;
-      }
-      if (filters.stato !== "__missing__" && variant.stato !== filters.stato) {
-        return false;
-      }
-    }
-
     if (filters.piattaforma && !variantMatchesField(variant.piattaforma, filters.piattaforma)) {
       return false;
     }
@@ -163,6 +156,16 @@ function titleMatchesFilters(title, filters) {
 
 function titlesMatchingFilters(titles, filters) {
   return titles.filter((title) => titleMatchesFilters(title, filters));
+}
+
+function getTitleFilterStatuses(title) {
+  const statuses = title.sottoVarianti.map((variant) => (variant.stato || "").trim());
+
+  if (statuses.some((status) => status === "OK")) {
+    return ["OK"];
+  }
+
+  return [...new Set(statuses)];
 }
 
 function summarizeTitle(title) {
@@ -283,7 +286,6 @@ function renderArchiveRoute(archive, params) {
   const routeContent = document.querySelector("#route-content");
   const titles = archive.activeTitles || [];
   const filters = getArchiveFilters(params);
-  const filteredTitles = titlesMatchingFilters(titles, filters);
   const statusCounts = listStatusCounts(titles);
   const platformOptions = listUniqueVariantFieldValues(titles, "piattaforma");
   const quickStatuses = statusCounts.slice(0, 4);
@@ -300,12 +302,13 @@ function renderArchiveRoute(archive, params) {
             <label>
               <span>Piattaforma</span>
               <input
+                id="platform-filter"
                 name="platform"
                 type="search"
-                list="platform-options"
                 autocomplete="off"
                 value="${escapeHtmlAttribute(filters.piattaforma)}"
               />
+              <div id="platform-suggestions" class="filter-suggestions"></div>
             </label>
             <label>
               <span>Edizione/versione</span>
@@ -333,20 +336,15 @@ function renderArchiveRoute(archive, params) {
               </select>
             </label>
           </div>
-          <datalist id="platform-options">
-            ${platformOptions
-              .map((platform) => `<option value="${escapeHtmlAttribute(platform)}"></option>`)
-              .join("")}
-          </datalist>
-          <div class="status-shortcuts">
+          <div id="status-shortcuts" class="status-shortcuts">
             ${quickStatuses
               .map(([status, count]) => {
-                const nextFilters = { ...filters, stato: status || "__missing__" };
-                const active = nextFilters.stato === filters.stato;
+                const statusValue = status || "__missing__";
+                const active = statusValue === filters.stato;
                 return `
-                  <a class="status-chip ${active ? "status-chip-active" : ""}" href="${buildArchiveHash(nextFilters)}">
-                    ${normalizeStatusLabel(status)} · ${count}
-                  </a>
+                  <button type="button" class="status-chip ${active ? "status-chip-active" : ""}" data-status-value="${statusValue}">
+                    ${normalizeStatusLabel(status)}
+                  </button>
                 `;
               })
               .join("")}
@@ -357,78 +355,96 @@ function renderArchiveRoute(archive, params) {
         </form>
       </aside>
       <div class="archive-results">
-        <div class="title-list title-list-compact">
-          ${
-            filteredTitles.length
-              ? filteredTitles
-                  .map((title) => {
-                    const summary = summarizeTitle(title);
-                    const indicator = getExportIndicator(title);
-
-                    return `
-                      <a class="title-card title-card-compact" href="#/detail?title=${encodeURIComponent(title.titolo)}">
-                        <div class="title-card-main">
-                          <div class="title-card-title">
-                            <span class="title-indicator title-indicator-${indicator.tone}" aria-label="${indicator.label}" title="${indicator.label}"></span>
-                            <strong>${title.titolo}</strong>
-                          </div>
-                          <span class="variant-count">${title.sottoVarianti.length} varianti</span>
-                        </div>
-                        <div class="title-card-summary">
-                          <span>${summary.platforms}</span>
-                          <span>${summary.supports}</span>
-                        </div>
-                      </a>
-                    `;
-                  })
-                  .join("")
-              : `
-                <div class="empty-state">
-                  <h3>Nessun risultato</h3>
-                </div>
-              `
-          }
-        </div>
+        <div id="title-list" class="title-list title-list-compact"></div>
       </div>
     </div>
   `;
 
   const filterForm = document.querySelector("#archive-filter-form");
   const platformInput = filterForm.elements.namedItem("platform");
+  const statusFilter = filterForm.elements.namedItem("status");
+  const platformSuggestions = document.querySelector("#platform-suggestions");
+  const textFilterInputs = [...filterForm.querySelectorAll('input[type="search"]')];
+  const titleList = document.querySelector("#title-list");
+  const statusShortcuts = document.querySelector("#status-shortcuts");
 
-  const syncFilters = () => {
+  const collectFilters = () => {
     const formData = new FormData(filterForm);
-    const nextFilters = {
+    return {
       titolo: String(formData.get("title") || "").trim(),
       piattaforma: String(formData.get("platform") || "").trim(),
       edizioneVersione: String(formData.get("edition") || "").trim(),
       supporto: String(formData.get("support") || "").trim(),
       stato: String(formData.get("status") || "").trim(),
     };
+  };
 
-    const nextHash = buildArchiveHash(nextFilters);
-    if (window.location.hash !== nextHash) {
-      window.location.hash = nextHash;
+  const renderTitleList = (nextFilters) => {
+    const filteredTitles = titlesMatchingFilters(titles, nextFilters);
+
+    titleList.innerHTML = filteredTitles.length
+      ? filteredTitles
+          .map((title) => {
+            const summary = summarizeTitle(title);
+            const indicator = getExportIndicator(title);
+
+            return `
+              <a class="title-card title-card-compact" href="#/detail?title=${encodeURIComponent(title.titolo)}">
+                <div class="title-card-main">
+                  <div class="title-card-title">
+                    <span class="title-indicator title-indicator-${indicator.tone}" aria-label="${indicator.label}" title="${indicator.label}"></span>
+                    <strong>${title.titolo}</strong>
+                  </div>
+                  <span class="variant-count">${title.sottoVarianti.length} varianti</span>
+                </div>
+                <div class="title-card-summary">
+                  <span>${summary.platforms}</span>
+                  <span>${summary.supports}</span>
+                </div>
+              </a>
+            `;
+          })
+          .join("")
+      : `
+        <div class="empty-state">
+          <h3>Nessun risultato</h3>
+        </div>
+      `;
+  };
+
+  const updateShortcutState = (nextFilters) => {
+    if (!(statusShortcuts instanceof HTMLDivElement)) {
+      return;
+    }
+
+    for (const chip of statusShortcuts.querySelectorAll("[data-status-value]")) {
+      chip.classList.toggle("status-chip-active", chip.getAttribute("data-status-value") === nextFilters.stato);
     }
   };
 
+  const updateArchiveUrl = (nextFilters) => {
+    const nextHash = buildArchiveHash(nextFilters);
+    if (window.location.hash !== nextHash) {
+      history.replaceState(null, "", nextHash);
+      state.currentRoute = nextHash;
+    }
+  };
+
+  const syncFilters = () => {
+    const nextFilters = collectFilters();
+    renderTitleList(nextFilters);
+    updateShortcutState(nextFilters);
+    updateArchiveUrl(nextFilters);
+  };
+
+  renderTitleList(filters);
+  updateShortcutState(filters);
+
   filterForm.addEventListener("change", syncFilters);
-  filterForm.addEventListener("input", (event) => {
-    if (!(event.target instanceof HTMLInputElement)) {
-      return;
-    }
 
-    if (event.target.name === "platform") {
-      return;
-    }
-
-    window.clearTimeout(state.archiveFilterTimerId);
-    state.archiveFilterTimerId = window.setTimeout(syncFilters, 180);
-  });
-
-  if (platformInput instanceof HTMLInputElement) {
-    platformInput.addEventListener("blur", syncFilters);
-    platformInput.addEventListener("keydown", (event) => {
+  for (const input of textFilterInputs) {
+    input.addEventListener("input", syncFilters);
+    input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
         syncFilters();
@@ -436,12 +452,81 @@ function renderArchiveRoute(archive, params) {
     });
   }
 
+  if (platformInput instanceof HTMLInputElement) {
+    platformInput.addEventListener("focus", () => {
+      platformInput.select();
+    });
+  }
+
+  if (platformInput instanceof HTMLInputElement && platformSuggestions instanceof HTMLDivElement) {
+    const renderPlatformSuggestions = () => {
+      const query = normalizeFilterTerm(platformInput.value);
+      const visibleOptions = platformOptions
+        .filter((platform) => !query || normalizeFilterTerm(platform).includes(query))
+        .slice(0, 8);
+
+      platformSuggestions.innerHTML = visibleOptions.length
+        ? visibleOptions
+            .map(
+              (platform) => `
+                <button type="button" class="filter-suggestion" data-platform-value="${escapeHtmlAttribute(platform)}">
+                  ${platform}
+                </button>
+              `,
+            )
+            .join("")
+        : "";
+      platformSuggestions.hidden = visibleOptions.length === 0;
+    };
+
+    renderPlatformSuggestions();
+
+    platformInput.addEventListener("focus", renderPlatformSuggestions);
+    platformInput.addEventListener("input", renderPlatformSuggestions);
+    platformInput.addEventListener("blur", () => {
+      window.setTimeout(() => {
+        platformSuggestions.hidden = true;
+        syncFilters();
+      }, 120);
+    });
+    platformInput.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        platformSuggestions.hidden = true;
+      }
+    });
+
+    platformSuggestions.addEventListener("click", (event) => {
+      const button = event.target instanceof HTMLElement ? event.target.closest("[data-platform-value]") : null;
+      if (!(button instanceof HTMLElement)) {
+        return;
+      }
+
+      platformInput.value = button.dataset.platformValue || "";
+      platformSuggestions.hidden = true;
+      syncFilters();
+    });
+  }
+
+  if (statusShortcuts instanceof HTMLDivElement && statusFilter instanceof HTMLSelectElement) {
+    statusShortcuts.addEventListener("click", (event) => {
+      const button = event.target instanceof HTMLElement ? event.target.closest("[data-status-value]") : null;
+      if (!(button instanceof HTMLElement)) {
+        return;
+      }
+
+      const nextValue = button.getAttribute("data-status-value") || "";
+      statusFilter.value = nextValue;
+      syncFilters();
+    });
+  }
+
   document.querySelector("#clear-filters").onclick = () => {
     window.clearTimeout(state.archiveFilterTimerId);
     filterForm.reset();
-    if (window.location.hash !== "#/archive") {
-      window.location.hash = "#/archive";
+    if (platformSuggestions instanceof HTMLDivElement) {
+      platformSuggestions.hidden = true;
     }
+    syncFilters();
   };
 }
 
