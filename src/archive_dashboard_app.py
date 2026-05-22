@@ -8,7 +8,7 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Callable
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from archive_model import SottoVarianteRecord, TitoloRecord
 from archive_storage import (
@@ -17,6 +17,7 @@ from archive_storage import (
     build_empty_local_archive_storage,
     create_title_record,
     serialize_local_archive_storage,
+    update_title_record,
 )
 
 STATIC_DIR = Path(__file__).resolve().parents[1] / "webapp"
@@ -41,6 +42,35 @@ class ArchiveDashboardState:
             self.storage,
             new_title=title,
             created_at=datetime.now(),
+        )
+        return self.storage
+
+    def update_title_and_variant(
+        self,
+        *,
+        existing_title: str,
+        variant_index: int,
+        payload: dict[str, object],
+    ) -> LocalArchiveStorage:
+        updated_title_name, updated_variant = _parse_update_payload(payload)
+        current_title = _find_title_record(self.storage, existing_title)
+
+        if variant_index < 0 or variant_index >= len(current_title.sotto_varianti):
+            raise ArchiveStorageMutationError(
+                f"variant_index {variant_index} is out of range for title {existing_title!r}"
+            )
+
+        updated_variants = list(current_title.sotto_varianti)
+        updated_variants[variant_index] = updated_variant
+        updated_title = TitoloRecord(
+            titolo=updated_title_name,
+            sotto_varianti=tuple(updated_variants),
+        )
+        self.storage = update_title_record(
+            self.storage,
+            existing_title=existing_title,
+            updated_title=updated_title,
+            updated_at=datetime.now(),
         )
         return self.storage
 
@@ -149,6 +179,16 @@ def make_request_handler(
 
             self.send_error(HTTPStatus.NOT_FOUND)
 
+        def do_PUT(self) -> None:  # noqa: N802
+            request_path = urlparse(self.path).path
+            update_match = _match_variant_update_path(request_path)
+            if update_match is not None:
+                existing_title, variant_index = update_match
+                self._update_title_variant(existing_title=existing_title, variant_index=variant_index)
+                return
+
+            self.send_error(HTTPStatus.NOT_FOUND)
+
         def end_headers(self) -> None:
             self.send_header("Cache-Control", "no-cache")
             super().end_headers()
@@ -197,6 +237,41 @@ def make_request_handler(
                 return
             except ArchiveStorageMutationError as exc:
                 self._serve_error(HTTPStatus.CONFLICT, "duplicate_title", str(exc))
+                return
+
+            self._serve_json(build_dashboard_payload(storage))
+
+        def _update_title_variant(self, *, existing_title: str, variant_index: int) -> None:
+            if storage_mutator is None:
+                self.send_error(HTTPStatus.NOT_IMPLEMENTED)
+                return
+
+            content_length = int(self.headers.get("Content-Length", "0"))
+            body = self.rfile.read(content_length)
+
+            try:
+                payload = json.loads(body.decode("utf-8"))
+                storage = storage_mutator.update_title_and_variant(
+                    existing_title=existing_title,
+                    variant_index=variant_index,
+                    payload=payload,
+                )
+            except json.JSONDecodeError:
+                self._serve_error(
+                    HTTPStatus.BAD_REQUEST,
+                    "invalid_json",
+                    "Il payload di modifica deve essere JSON valido.",
+                )
+                return
+            except (TypeError, ValueError) as exc:
+                self._serve_error(HTTPStatus.BAD_REQUEST, "invalid_payload", str(exc))
+                return
+            except ArchiveStorageMutationError as exc:
+                error_message = str(exc)
+                if "already exists" in error_message:
+                    self._serve_error(HTTPStatus.CONFLICT, "duplicate_title", error_message)
+                    return
+                self._serve_error(HTTPStatus.NOT_FOUND, "missing_target", error_message)
                 return
 
             self._serve_json(build_dashboard_payload(storage))
@@ -255,6 +330,63 @@ def _parse_create_payload(payload: dict[str, object]) -> TitoloRecord:
             ),
         ),
     )
+
+
+def _parse_update_payload(payload: dict[str, object]) -> tuple[str, SottoVarianteRecord]:
+    if not isinstance(payload, dict):
+        raise TypeError("update payload must be a JSON object")
+
+    title = payload.get("titolo")
+    variant = payload.get("sottoVariante")
+    if not isinstance(title, str):
+        raise TypeError("titolo must be a string")
+    if not isinstance(variant, dict):
+        raise TypeError("sottoVariante must be an object")
+
+    piattaforma = variant.get("piattaforma")
+    edizione_versione = variant.get("edizioneVersione")
+    supporto = variant.get("supporto")
+    stato = variant.get("stato")
+    if not all(isinstance(value, str) for value in (piattaforma, edizione_versione, supporto, stato)):
+        raise TypeError(
+            "sottoVariante must contain string piattaforma, edizioneVersione, supporto, stato"
+        )
+
+    return title, SottoVarianteRecord(
+        piattaforma=piattaforma,
+        edizione_versione=edizione_versione,
+        supporto=supporto,
+        stato=stato,
+    )
+
+
+def _find_title_record(storage: LocalArchiveStorage, title_name: str) -> TitoloRecord:
+    normalized_title = title_name.strip()
+    if not normalized_title:
+        raise ValueError("existing_title must be a non-blank string")
+
+    for title in storage.active_titles:
+        if title.titolo == normalized_title:
+            return title
+    raise ArchiveStorageMutationError(f"title {normalized_title!r} was not found in active archive")
+
+
+def _match_variant_update_path(request_path: str) -> tuple[str, int] | None:
+    parts = request_path.split("/")
+    if len(parts) != 6 or parts[:3] != ["", "api", "titles"] or parts[4] != "variants":
+        return None
+
+    encoded_title = parts[3]
+    encoded_variant_index = parts[5]
+    if not encoded_title:
+        return None
+
+    try:
+        variant_index = int(encoded_variant_index)
+    except ValueError:
+        return None
+
+    return unquote(encoded_title), variant_index
 
 
 def main() -> None:

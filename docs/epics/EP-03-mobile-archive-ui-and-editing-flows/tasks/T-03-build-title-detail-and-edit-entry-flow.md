@@ -8,7 +8,7 @@ Objective: Definire il contratto della vista dettaglio read-first e dell'ingress
 
 Questo task definisce come il modello `Titolo + Sotto-varianti` diventa leggibile sul telefono prima ancora di essere modificabile. Il dettaglio deve ridurre il carico cognitivo del foglio spreadsheet rendendo esplicito il record logico, l'ordine delle sotto-varianti e lo stato di ciascun campo rilevante.
 
-La vista e' read-first. L'editing parte solo da azione intenzionale. I campi importati legacy mancanti devono essere mostrati in modo esplicito e comprensibile, non inventati o nascosti. Il task definisce l'ingresso nel flusso di modifica, non l'intero contratto di salvataggio del form.
+La vista e' read-first. L'editing parte solo da azione intenzionale. I campi importati legacy mancanti devono essere mostrati in modo esplicito e comprensibile, non inventati o nascosti. Il task definisce l'ingresso nel flusso di modifica, non l'intero contratto di salvataggio del form, demandato al successivo `EP-03 / T-05`.
 
 ## Canonical Contract
 
@@ -42,7 +42,7 @@ La vista e' read-first. L'editing parte solo da azione intenzionale. I campi imp
 
 ### 5. Scope rules
 
-- Questo task non definisce ancora il contratto completo di mutazione persistita, gia' demandato a `EP-02 / T-03`.
+- Questo task non definisce ancora il contratto completo del form di update persistito, demandato a `EP-03 / T-05` sopra il boundary di scrittura definito in `EP-02 / T-03`.
 - Questo task non impone ancora il layout finale del form di editing.
 - Questo task non puo' assumere che tutti i campi importati siano sempre valorizzati.
 
@@ -127,5 +127,6 @@ Blocks:
 
 ## Downstream Task Impact
 
+- `EP-03 / T-05` must turn this explicit edit entry into a runnable persisted update flow without collapsing the read-first baseline defined here.
 - `EP-03 / T-04` must return newly created records into a detail surface consistent with this task.
 - `EP-05 / T-02` must verify read-first behavior, explicit edit entry, and rendering of missing imported values on Android-sized devices.

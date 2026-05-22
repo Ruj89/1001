@@ -185,3 +185,115 @@ class ArchiveDashboardServerTests(unittest.TestCase):
             thread.join(timeout=2)
 
         self.assertEqual(raised.exception.code, 409)
+
+    def test_updates_existing_title_and_variant_through_api(self) -> None:
+        storage = build_active_local_archive_storage(
+            (_sample_title("Chrono Trigger"),),
+            activated_at=datetime(2026, 5, 22, 8, 30, 0),
+        )
+        server = run_dashboard_server(host="127.0.0.1", port=0, storage=storage)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        try:
+            host, port = server.server_address
+            request = Request(
+                f"http://{host}:{port}/api/titles/Chrono%20Trigger/variants/0",
+                data=json.dumps(
+                    {
+                        "titolo": "Chrono Trigger DX",
+                        "sottoVariante": {
+                            "piattaforma": "SNES",
+                            "edizioneVersione": "NTSC-J",
+                            "supporto": "cartuccia",
+                            "stato": "Completo",
+                        },
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="PUT",
+            )
+            with urlopen(request) as response:
+                self.assertEqual(response.status, 200)
+                payload = json.loads(response.read().decode("utf-8"))
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+        updated_title = payload["archive"]["activeTitles"][0]
+        self.assertEqual(updated_title["titolo"], "Chrono Trigger DX")
+        self.assertEqual(updated_title["sottoVarianti"][0]["edizioneVersione"], "NTSC-J")
+        self.assertEqual(updated_title["sottoVarianti"][0]["stato"], "Completo")
+
+    def test_rejects_update_with_duplicate_title_through_api(self) -> None:
+        storage = build_active_local_archive_storage(
+            (_sample_title("Chrono Trigger"), _sample_title("Terranigma")),
+            activated_at=datetime(2026, 5, 22, 8, 30, 0),
+        )
+        server = run_dashboard_server(host="127.0.0.1", port=0, storage=storage)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        try:
+            host, port = server.server_address
+            request = Request(
+                f"http://{host}:{port}/api/titles/Chrono%20Trigger/variants/0",
+                data=json.dumps(
+                    {
+                        "titolo": "Terranigma",
+                        "sottoVariante": {
+                            "piattaforma": "SNES",
+                            "edizioneVersione": "PAL",
+                            "supporto": "cartuccia",
+                            "stato": "OK",
+                        },
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="PUT",
+            )
+            with self.assertRaises(HTTPError) as raised:
+                urlopen(request)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+        self.assertEqual(raised.exception.code, 409)
+
+    def test_rejects_update_for_missing_variant_through_api(self) -> None:
+        storage = build_active_local_archive_storage(
+            (_sample_title("Chrono Trigger"),),
+            activated_at=datetime(2026, 5, 22, 8, 30, 0),
+        )
+        server = run_dashboard_server(host="127.0.0.1", port=0, storage=storage)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        try:
+            host, port = server.server_address
+            request = Request(
+                f"http://{host}:{port}/api/titles/Chrono%20Trigger/variants/9",
+                data=json.dumps(
+                    {
+                        "titolo": "Chrono Trigger",
+                        "sottoVariante": {
+                            "piattaforma": "SNES",
+                            "edizioneVersione": "PAL",
+                            "supporto": "cartuccia",
+                            "stato": "OK",
+                        },
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="PUT",
+            )
+            with self.assertRaises(HTTPError) as raised:
+                urlopen(request)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+        self.assertEqual(raised.exception.code, 404)

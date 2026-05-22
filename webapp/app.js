@@ -32,6 +32,14 @@ function presentFieldValue(value) {
   return value || "Valore mancante";
 }
 
+function escapeHtmlAttribute(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
 async function createTitleRecord(payload) {
   const response = await fetch("/api/titles", {
     method: "POST",
@@ -44,6 +52,25 @@ async function createTitleRecord(payload) {
   const body = await response.json();
   if (!response.ok) {
     throw new Error(body.message || "Creazione non riuscita.");
+  }
+  return body;
+}
+
+async function updateTitleRecord(existingTitle, variantIndex, payload) {
+  const response = await fetch(
+    `/api/titles/${encodeURIComponent(existingTitle)}/variants/${variantIndex}`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body.message || "Modifica non riuscita.");
   }
   return body;
 }
@@ -322,41 +349,88 @@ function renderEditEntryRoute(archive, params) {
     return;
   }
 
+  const selectedVariant = title.sottoVarianti[variantIndex];
   preview.innerHTML = `
     <div class="detail-header">
       <div>
-        <p class="kicker">Ingresso modifica</p>
+        <p class="kicker">Modifica persistita</p>
         <h3>${title.titolo}</h3>
-        <p>La modifica parte solo da un'azione esplicita del dettaglio. Il form persistente verra' completato nel task successivo.</p>
+        <p>La modifica parte da un'azione esplicita del dettaglio e salva il titolo con la sotto-variante selezionata nel dataset locale attivo.</p>
       </div>
       <div class="detail-actions">
         <a class="ghost-link" href="#/detail?title=${encodeURIComponent(title.titolo)}">Torna al dettaglio</a>
       </div>
     </div>
-    <article class="variant-card">
-      <div class="variant-card-head">
-        <strong>Sotto-variante ${variantIndex + 1}</strong>
+    <form id="edit-form" class="create-form">
+      <label>
+        <span>Titolo</span>
+        <input name="titolo" type="text" required value="${escapeHtmlAttribute(title.titolo)}" />
+      </label>
+      <div class="variant-card">
+        <div class="variant-card-head">
+          <strong>Sotto-variante ${variantIndex + 1}</strong>
+        </div>
+        <label>
+          <span>Piattaforma</span>
+          <input name="piattaforma" type="text" required value="${escapeHtmlAttribute(selectedVariant.piattaforma)}" />
+        </label>
+        <label>
+          <span>Edizione/versione</span>
+          <input name="edizioneVersione" type="text" required value="${escapeHtmlAttribute(selectedVariant.edizioneVersione)}" />
+        </label>
+        <label>
+          <span>Supporto</span>
+          <input name="supporto" type="text" required value="${escapeHtmlAttribute(selectedVariant.supporto)}" />
+        </label>
+        <label>
+          <span>Stato</span>
+          <input name="stato" type="text" required value="${escapeHtmlAttribute(selectedVariant.stato)}" />
+        </label>
       </div>
-      <dl class="variant-grid">
-        <div>
-          <dt>Piattaforma</dt>
-          <dd>${presentFieldValue(title.sottoVarianti[variantIndex].piattaforma)}</dd>
-        </div>
-        <div>
-          <dt>Edizione/versione</dt>
-          <dd>${presentFieldValue(title.sottoVarianti[variantIndex].edizioneVersione)}</dd>
-        </div>
-        <div>
-          <dt>Supporto</dt>
-          <dd>${presentFieldValue(title.sottoVarianti[variantIndex].supporto)}</dd>
-        </div>
-        <div>
-          <dt>Stato</dt>
-          <dd>${normalizeStatusLabel(title.sottoVarianti[variantIndex].stato)}</dd>
-        </div>
-      </dl>
-    </article>
+      <div class="form-actions">
+        <button type="submit">Salva modifiche</button>
+      </div>
+      <p id="edit-feedback" class="form-feedback" aria-live="polite"></p>
+    </form>
   `;
+
+  const form = document.querySelector("#edit-form");
+  const feedback = document.querySelector("#edit-feedback");
+  form.onsubmit = async (event) => {
+    event.preventDefault();
+    const formData = new FormData(form);
+    const payload = {
+      titolo: String(formData.get("titolo") || "").trim(),
+      sottoVariante: {
+        piattaforma: String(formData.get("piattaforma") || "").trim(),
+        edizioneVersione: String(formData.get("edizioneVersione") || "").trim(),
+        supporto: String(formData.get("supporto") || "").trim(),
+        stato: String(formData.get("stato") || "").trim(),
+      },
+    };
+
+    if (
+      !payload.titolo ||
+      !payload.sottoVariante.piattaforma ||
+      !payload.sottoVariante.edizioneVersione ||
+      !payload.sottoVariante.supporto ||
+      !payload.sottoVariante.stato
+    ) {
+      feedback.textContent = "Compila tutti i campi richiesti prima del salvataggio.";
+      return;
+    }
+
+    feedback.textContent = "Salvataggio in corso...";
+
+    try {
+      const nextPayload = await updateTitleRecord(title.titolo, variantIndex, payload);
+      state.payload = nextPayload;
+      feedback.textContent = "";
+      window.location.hash = `#/detail?title=${encodeURIComponent(payload.titolo)}`;
+    } catch (error) {
+      feedback.textContent = error.message;
+    }
+  };
 }
 
 function renderCreateRoute() {
