@@ -1,6 +1,6 @@
 # T-04 Build create title flow
 
-Status: `accepted`
+Status: `completed`
 
 Objective: Definire il flusso di creazione di un nuovo titolo dal prodotto, con validazione minima coerente con il boundary di scrittura locale e ritorno immediato ai contesti di consultazione.
 
@@ -45,10 +45,10 @@ Il flusso deve partire dalla UI primaria, validare i campi necessari prima della
 
 ## Subtasks
 
-- `ST-04.1` Provide a create-title entry point from the primary UI. Status: `accepted`
-- `ST-04.2` Capture the minimum required fields for the initial sub-variant. Status: `accepted`
-- `ST-04.3` Validate the create flow before local persistence. Status: `accepted`
-- `ST-04.4` Return the new record to list, search, and detail contexts. Status: `accepted`
+- `ST-04.1` Provide a create-title entry point from the primary UI. Status: `completed`
+- `ST-04.2` Capture the minimum required fields for the initial sub-variant. Status: `completed`
+- `ST-04.3` Validate the create flow before local persistence. Status: `completed`
+- `ST-04.4` Return the new record to list, search, and detail contexts. Status: `completed`
 
 ## Subtask Details And Dependencies
 

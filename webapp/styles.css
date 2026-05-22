@@ -195,7 +195,8 @@ dd {
 .title-list,
 .status-pill-row,
 .detail-actions,
-.variant-list {
+.variant-list,
+.form-actions {
   display: grid;
   gap: 10px;
 }
@@ -317,6 +318,42 @@ dd {
 .text-link {
   color: var(--accent-deep);
   text-decoration: none;
+}
+
+.create-form {
+  display: grid;
+  gap: 12px;
+}
+
+.create-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.create-form span {
+  font-size: 0.88rem;
+  color: var(--accent-deep);
+}
+
+.create-form input,
+.form-actions button {
+  min-height: 48px;
+  border-radius: 14px;
+  border: 1px solid rgba(120, 70, 36, 0.14);
+  background: #fffdf8;
+  font: inherit;
+  padding: 0 12px;
+}
+
+.form-actions button {
+  background: var(--accent);
+  color: #fff;
+  border-color: transparent;
+}
+
+.form-feedback {
+  margin: 0;
+  color: var(--accent-deep);
 }
 
 .status-pill-row {

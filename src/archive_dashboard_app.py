@@ -3,15 +3,19 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import dataclass
+from datetime import datetime
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Callable
 from urllib.parse import urlparse
 
+from archive_model import SottoVarianteRecord, TitoloRecord
 from archive_storage import (
+    ArchiveStorageMutationError,
     LocalArchiveStorage,
     build_empty_local_archive_storage,
+    create_title_record,
     serialize_local_archive_storage,
 )
 
@@ -25,6 +29,20 @@ class DashboardRouteEntry:
     href: str
     description: str
     primary: bool = False
+
+
+@dataclass(slots=True)
+class ArchiveDashboardState:
+    storage: LocalArchiveStorage
+
+    def create_title(self, payload: dict[str, object]) -> LocalArchiveStorage:
+        title = _parse_create_payload(payload)
+        self.storage = create_title_record(
+            self.storage,
+            new_title=title,
+            created_at=datetime.now(),
+        )
+        return self.storage
 
 
 def build_dashboard_payload(storage: LocalArchiveStorage) -> dict[str, object]:
@@ -102,6 +120,7 @@ def build_dashboard_payload(storage: LocalArchiveStorage) -> dict[str, object]:
 
 def make_request_handler(
     storage_supplier: Callable[[], LocalArchiveStorage] | None = None,
+    storage_mutator: ArchiveDashboardState | None = None,
 ) -> type[SimpleHTTPRequestHandler]:
     if storage_supplier is None:
         storage_supplier = build_empty_local_archive_storage
@@ -121,6 +140,14 @@ def make_request_handler(
             if request_path == "/":
                 self.path = "/index.html"
             return super().do_GET()
+
+        def do_POST(self) -> None:  # noqa: N802
+            request_path = urlparse(self.path).path
+            if request_path == "/api/titles":
+                self._create_title()
+                return
+
+            self.send_error(HTTPStatus.NOT_FOUND)
 
         def end_headers(self) -> None:
             self.send_header("Cache-Control", "no-cache")
@@ -147,6 +174,41 @@ def make_request_handler(
             self.end_headers()
             self.wfile.write(encoded)
 
+        def _create_title(self) -> None:
+            if storage_mutator is None:
+                self.send_error(HTTPStatus.NOT_IMPLEMENTED)
+                return
+
+            content_length = int(self.headers.get("Content-Length", "0"))
+            body = self.rfile.read(content_length)
+
+            try:
+                payload = json.loads(body.decode("utf-8"))
+                storage = storage_mutator.create_title(payload)
+            except json.JSONDecodeError:
+                self._serve_error(
+                    HTTPStatus.BAD_REQUEST,
+                    "invalid_json",
+                    "Il payload di creazione deve essere JSON valido.",
+                )
+                return
+            except (TypeError, ValueError) as exc:
+                self._serve_error(HTTPStatus.BAD_REQUEST, "invalid_payload", str(exc))
+                return
+            except ArchiveStorageMutationError as exc:
+                self._serve_error(HTTPStatus.CONFLICT, "duplicate_title", str(exc))
+                return
+
+            self._serve_json(build_dashboard_payload(storage))
+
+        def _serve_error(self, status: HTTPStatus, code: str, message: str) -> None:
+            encoded = json.dumps({"error": code, "message": message}).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+
     return ArchiveDashboardRequestHandler
 
 
@@ -157,8 +219,42 @@ def run_dashboard_server(
     storage: LocalArchiveStorage | None = None,
 ) -> ThreadingHTTPServer:
     resolved_storage = storage or build_empty_local_archive_storage()
-    handler = make_request_handler(lambda: resolved_storage)
+    dashboard_state = ArchiveDashboardState(storage=resolved_storage)
+    handler = make_request_handler(lambda: dashboard_state.storage, dashboard_state)
     return ThreadingHTTPServer((host, port), handler)
+
+
+def _parse_create_payload(payload: dict[str, object]) -> TitoloRecord:
+    if not isinstance(payload, dict):
+        raise TypeError("create payload must be a JSON object")
+
+    title = payload.get("titolo")
+    variant = payload.get("sottoVariante")
+    if not isinstance(title, str):
+        raise TypeError("titolo must be a string")
+    if not isinstance(variant, dict):
+        raise TypeError("sottoVariante must be an object")
+
+    piattaforma = variant.get("piattaforma")
+    edizione_versione = variant.get("edizioneVersione")
+    supporto = variant.get("supporto")
+    stato = variant.get("stato")
+    if not all(isinstance(value, str) for value in (piattaforma, edizione_versione, supporto, stato)):
+        raise TypeError(
+            "sottoVariante must contain string piattaforma, edizioneVersione, supporto, stato"
+        )
+
+    return TitoloRecord(
+        titolo=title,
+        sotto_varianti=(
+            SottoVarianteRecord(
+                piattaforma=piattaforma,
+                edizione_versione=edizione_versione,
+                supporto=supporto,
+                stato=stato,
+            ),
+        ),
+    )
 
 
 def main() -> None:

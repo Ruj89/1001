@@ -6,7 +6,8 @@ import threading
 import unittest
 from datetime import datetime
 from pathlib import Path
-from urllib.request import urlopen
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -110,3 +111,77 @@ class ArchiveDashboardServerTests(unittest.TestCase):
         self.assertTrue(payload["archive"]["hasActiveArchive"])
         self.assertIn("Archivio 1001", html)
         self.assertIn("Ricerca primaria", html)
+
+    def test_creates_title_through_api_and_returns_updated_payload(self) -> None:
+        storage = build_active_local_archive_storage(
+            (_sample_title("Chrono Trigger"),),
+            activated_at=datetime(2026, 5, 22, 8, 30, 0),
+        )
+        server = run_dashboard_server(host="127.0.0.1", port=0, storage=storage)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        try:
+            host, port = server.server_address
+            request = Request(
+                f"http://{host}:{port}/api/titles",
+                data=json.dumps(
+                    {
+                        "titolo": "Terranigma",
+                        "sottoVariante": {
+                            "piattaforma": "SNES",
+                            "edizioneVersione": "PAL",
+                            "supporto": "cartuccia",
+                            "stato": "OK",
+                        },
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urlopen(request) as response:
+                self.assertEqual(response.status, 200)
+                payload = json.loads(response.read().decode("utf-8"))
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+        self.assertEqual(payload["archive"]["metadata"]["numeroRecord"], 2)
+        self.assertEqual(payload["archive"]["activeTitles"][1]["titolo"], "Terranigma")
+
+    def test_rejects_duplicate_title_creation_through_api(self) -> None:
+        storage = build_active_local_archive_storage(
+            (_sample_title("Chrono Trigger"),),
+            activated_at=datetime(2026, 5, 22, 8, 30, 0),
+        )
+        server = run_dashboard_server(host="127.0.0.1", port=0, storage=storage)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        try:
+            host, port = server.server_address
+            request = Request(
+                f"http://{host}:{port}/api/titles",
+                data=json.dumps(
+                    {
+                        "titolo": "Chrono Trigger",
+                        "sottoVariante": {
+                            "piattaforma": "SNES",
+                            "edizioneVersione": "PAL",
+                            "supporto": "cartuccia",
+                            "stato": "OK",
+                        },
+                    }
+                ).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with self.assertRaises(HTTPError) as raised:
+                urlopen(request)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+        self.assertEqual(raised.exception.code, 409)

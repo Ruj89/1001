@@ -32,6 +32,22 @@ function presentFieldValue(value) {
   return value || "Valore mancante";
 }
 
+async function createTitleRecord(payload) {
+  const response = await fetch("/api/titles", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body.message || "Creazione non riuscita.");
+  }
+  return body;
+}
+
 function listStatusCounts(titles) {
   const counts = new Map();
 
@@ -343,6 +359,87 @@ function renderEditEntryRoute(archive, params) {
   `;
 }
 
+function renderCreateRoute() {
+  const preview = document.querySelector("#route-preview");
+  preview.innerHTML = `
+    <div class="detail-header">
+      <div>
+        <p class="kicker">Create title</p>
+        <h3>Nuovo titolo</h3>
+        <p>Inserisci un titolo e una prima sotto-variante completa. Il salvataggio usa il boundary locale del dataset attivo.</p>
+      </div>
+      <div class="detail-actions">
+        <a class="ghost-link" href="#/dashboard">Torna alla dashboard</a>
+        <a class="ghost-link" href="#/archive">Vai alla lista</a>
+      </div>
+    </div>
+    <form id="create-form" class="create-form">
+      <label>
+        <span>Titolo</span>
+        <input name="titolo" type="text" required />
+      </label>
+      <label>
+        <span>Piattaforma</span>
+        <input name="piattaforma" type="text" required />
+      </label>
+      <label>
+        <span>Edizione/versione</span>
+        <input name="edizioneVersione" type="text" required />
+      </label>
+      <label>
+        <span>Supporto</span>
+        <input name="supporto" type="text" required />
+      </label>
+      <label>
+        <span>Stato</span>
+        <input name="stato" type="text" required />
+      </label>
+      <div class="form-actions">
+        <button type="submit">Salva titolo</button>
+      </div>
+      <p id="create-feedback" class="form-feedback" aria-live="polite"></p>
+    </form>
+  `;
+
+  const form = document.querySelector("#create-form");
+  const feedback = document.querySelector("#create-feedback");
+  form.onsubmit = async (event) => {
+    event.preventDefault();
+    const formData = new FormData(form);
+    const payload = {
+      titolo: String(formData.get("titolo") || "").trim(),
+      sottoVariante: {
+        piattaforma: String(formData.get("piattaforma") || "").trim(),
+        edizioneVersione: String(formData.get("edizioneVersione") || "").trim(),
+        supporto: String(formData.get("supporto") || "").trim(),
+        stato: String(formData.get("stato") || "").trim(),
+      },
+    };
+
+    if (
+      !payload.titolo ||
+      !payload.sottoVariante.piattaforma ||
+      !payload.sottoVariante.edizioneVersione ||
+      !payload.sottoVariante.supporto ||
+      !payload.sottoVariante.stato
+    ) {
+      feedback.textContent = "Compila tutti i campi richiesti prima del salvataggio.";
+      return;
+    }
+
+    feedback.textContent = "Salvataggio in corso...";
+
+    try {
+      const nextPayload = await createTitleRecord(payload);
+      state.payload = nextPayload;
+      feedback.textContent = "";
+      window.location.hash = `#/detail?title=${encodeURIComponent(payload.titolo)}`;
+    } catch (error) {
+      feedback.textContent = error.message;
+    }
+  };
+}
+
 function renderPreview(appConfig, archive) {
   const preview = document.querySelector("#route-preview");
   const { routeId, params } = parseHash(state.currentRoute);
@@ -360,6 +457,11 @@ function renderPreview(appConfig, archive) {
 
   if (routeId === "edit" && archive.hasActiveArchive) {
     renderEditEntryRoute(archive, params);
+    return;
+  }
+
+  if (routeId === "create") {
+    renderCreateRoute();
     return;
   }
 
