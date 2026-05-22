@@ -1,0 +1,9 @@
+{
+  "name": "Archivio 1001",
+  "short_name": "Archivio1001",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6efe3",
+  "theme_color": "#b04a2f",
+  "description": "Shell PWA locale per dashboard, ricerca e navigazione dell'archivio 1001."
+}

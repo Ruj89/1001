@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#b04a2f" />
+    <title>Archivio 1001</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <p class="eyebrow">Archivio personale offline-first</p>
+        <h1 id="app-title">Archivio 1001</h1>
+        <p id="app-tagline" class="tagline"></p>
+      </header>
+
+      <section class="dashboard-card search-card" aria-labelledby="search-heading">
+        <div class="section-head">
+          <p class="kicker">Dashboard</p>
+          <h2 id="search-heading">Ricerca primaria</h2>
+        </div>
+        <form id="search-form" class="search-form">
+          <label class="sr-only" for="search-input">Cerca un titolo</label>
+          <input
+            id="search-input"
+            name="query"
+            type="search"
+            autocomplete="off"
+            placeholder="Cerca un titolo"
+          />
+          <button id="search-submit" type="submit">Vai alla lista</button>
+        </form>
+        <p class="supporting-copy">
+          La dashboard apre la ricerca come azione dominante e lascia import/export come azioni secondarie.
+        </p>
+      </section>
+
+      <section class="dashboard-card" aria-labelledby="actions-heading">
+        <div class="section-head">
+          <p class="kicker">Quick actions</p>
+          <h2 id="actions-heading">Punti di ingresso principali</h2>
+        </div>
+        <nav id="route-grid" class="route-grid" aria-label="Navigazione primaria"></nav>
+      </section>
+
+      <section class="dashboard-card" aria-labelledby="archive-heading">
+        <div class="section-head">
+          <p class="kicker">Stato archivio</p>
+          <h2 id="archive-heading">Dataset locale</h2>
+        </div>
+        <div id="archive-state"></div>
+      </section>
+
+      <section class="dashboard-card route-preview" aria-labelledby="preview-heading">
+        <div class="section-head">
+          <p class="kicker">Route shell</p>
+          <h2 id="preview-heading">Baseline per i flussi successivi</h2>
+        </div>
+        <div id="route-preview" class="preview-copy"></div>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

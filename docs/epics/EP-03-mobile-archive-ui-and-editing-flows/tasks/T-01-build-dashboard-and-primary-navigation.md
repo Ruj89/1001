@@ -1,6 +1,6 @@
 # T-01 Build dashboard and primary navigation
 
-Status: `accepted`
+Status: `completed`
 
 Objective: Stabilire la shell browser/PWA eseguibile dell'MVP e definire la dashboard come home screen mobile-first con ricerca primaria, quick actions e stato minimo archivio.
 
@@ -55,10 +55,10 @@ La dashboard e' la home dell'app. Deve essere il primo punto di ingresso del pro
 
 ## Subtasks
 
-- `ST-01.1` Establish the browser/PWA shell and dashboard home entry. Status: `accepted`
-- `ST-01.2` Place title search in primary visual and interaction position. Status: `accepted`
-- `ST-01.3` Expose primary quick actions and route-level navigation entry points. Status: `accepted`
-- `ST-01.4` Show archive metadata and coherent empty-state behavior on the dashboard. Status: `accepted`
+- `ST-01.1` Establish the browser/PWA shell and dashboard home entry. Status: `completed`
+- `ST-01.2` Place title search in primary visual and interaction position. Status: `completed`
+- `ST-01.3` Expose primary quick actions and route-level navigation entry points. Status: `completed`
+- `ST-01.4` Show archive metadata and coherent empty-state behavior on the dashboard. Status: `completed`
 
 ## Subtask Details And Dependencies
 
