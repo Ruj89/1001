@@ -6,6 +6,12 @@ from pathlib import Path
 
 
 WEBAPP_DIR = Path(__file__).resolve().parents[1] / "webapp"
+REWRITTEN_FILES = {
+    "/index.html",
+    "/manifest.webmanifest",
+    "/service-worker.js",
+    "/app.js",
+}
 
 
 class StaticWebAppHandler(SimpleHTTPRequestHandler):
@@ -15,6 +21,9 @@ class StaticWebAppHandler(SimpleHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         if self.path == "/":
             self.path = "/index.html"
+        if self.path in REWRITTEN_FILES:
+            self._serve_rewritten_asset(self.path)
+            return
         return super().do_GET()
 
     def guess_type(self, path: str) -> str:
@@ -26,6 +35,20 @@ class StaticWebAppHandler(SimpleHTTPRequestHandler):
 
     def log_message(self, format: str, *args) -> None:
         return
+
+    def _serve_rewritten_asset(self, request_path: str) -> None:
+        asset_path = WEBAPP_DIR / request_path.lstrip("/")
+        if not asset_path.is_file():
+            self.send_error(404)
+            return
+
+        content = asset_path.read_text(encoding="utf-8").replace("__DEPLOY_BASE_PATH__", "/")
+        encoded = content.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", self.guess_type(str(asset_path)))
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
 
 
 def main() -> None:

@@ -351,6 +351,16 @@ dd {
   border-color: transparent;
 }
 
+.dual-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-actions .secondary-action {
+  background: rgba(176, 74, 47, 0.08);
+  color: var(--accent-deep);
+  border-color: rgba(120, 70, 36, 0.14);
+}
+
 .form-feedback {
   margin: 0;
   color: var(--accent-deep);
@@ -385,6 +395,10 @@ dd {
   .status-shortcuts,
   .variant-grid,
   .detail-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .dual-actions {
     grid-template-columns: 1fr;
   }
 

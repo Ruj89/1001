@@ -43,6 +43,13 @@ const APP_CONFIG = {
   ],
 };
 
+const ODS_MIME_TYPE = "application/vnd.oasis.opendocument.spreadsheet";
+const XML_NAMESPACES = {
+  office: "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
+  table: "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
+  text: "urn:oasis:names:tc:opendocument:xmlns:text:1.0",
+};
+
 function requestToPromise(request) {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
@@ -115,10 +122,10 @@ function ensureVariant(variant, context) {
   }
 
   return {
-    piattaforma: ensureString(variant.piattaforma, `${context}.piattaforma`),
-    edizioneVersione: ensureString(variant.edizioneVersione, `${context}.edizioneVersione`),
-    supporto: ensureString(variant.supporto, `${context}.supporto`),
-    stato: ensureString(variant.stato, `${context}.stato`),
+    piattaforma: ensureString(variant.piattaforma, `${context}.piattaforma`).trim(),
+    edizioneVersione: ensureString(variant.edizioneVersione, `${context}.edizioneVersione`).trim(),
+    supporto: ensureString(variant.supporto, `${context}.supporto`).trim(),
+    stato: ensureString(variant.stato, `${context}.stato`).trim(),
   };
 }
 
@@ -134,11 +141,17 @@ function ensureTitle(title, context) {
     throw new Error(`${context}.sottoVarianti must be a list.`);
   }
 
+  const sottoVarianti = title.sottoVarianti.map((variant, index) =>
+    ensureVariant(variant, `${context}.sottoVarianti[${index}]`),
+  );
+
+  if (!sottoVarianti.length) {
+    throw new Error(`${context}.sottoVarianti must contain at least one item.`);
+  }
+
   return {
     titolo,
-    sottoVarianti: title.sottoVarianti.map((variant, index) =>
-      ensureVariant(variant, `${context}.sottoVarianti[${index}]`),
-    ),
+    sottoVarianti,
   };
 }
 
@@ -164,6 +177,34 @@ function ensureMetadata(metadata) {
     numeroRecord: metadata.numeroRecord,
     ultimaModificaLocale: metadata.ultimaModificaLocale,
     versioneSchema: metadata.versioneSchema,
+  };
+}
+
+function ensurePendingImport(pendingImport) {
+  if (pendingImport == null) {
+    return null;
+  }
+  if (!pendingImport || typeof pendingImport !== "object") {
+    throw new Error("pendingImport must be an object or null.");
+  }
+  const sourceName = ensureString(pendingImport.sourceName, "pendingImport.sourceName").trim();
+  const stagedAt = ensureString(pendingImport.stagedAt, "pendingImport.stagedAt").trim();
+  if (!sourceName) {
+    throw new Error("pendingImport.sourceName must be a non-blank string.");
+  }
+  if (!stagedAt) {
+    throw new Error("pendingImport.stagedAt must be a non-blank string.");
+  }
+  if (!Array.isArray(pendingImport.titles)) {
+    throw new Error("pendingImport.titles must be a list.");
+  }
+
+  return {
+    sourceName,
+    stagedAt,
+    titles: pendingImport.titles.map((title, index) =>
+      ensureTitle(title, `pendingImport.titles[${index}]`),
+    ),
   };
 }
 
@@ -201,7 +242,7 @@ function ensureStoragePayload(payload) {
   return {
     schemaVersion: payload.schemaVersion,
     activeArchive,
-    pendingImport: payload.pendingImport || null,
+    pendingImport: ensurePendingImport(payload.pendingImport),
   };
 }
 
@@ -221,6 +262,7 @@ export function buildDashboardPayload(storagePayload) {
   const metadata = activeArchive ? activeArchive.metadata : null;
   const activeTitles = activeArchive ? activeArchive.titles : [];
   const hasActiveArchive = Boolean(metadata && metadata.archivioAttivo);
+  const pendingImport = normalized.pendingImport;
 
   return {
     app: {
@@ -238,6 +280,14 @@ export function buildDashboardPayload(storagePayload) {
       hasActiveArchive,
       metadata,
       activeTitles,
+      pendingImport: pendingImport
+        ? {
+            sourceName: pendingImport.sourceName,
+            stagedAt: pendingImport.stagedAt,
+            titleCount: pendingImport.titles.length,
+          }
+        : null,
+      requiresOverwriteConfirmation: hasActiveArchive && Boolean(pendingImport),
       emptyState: {
         title: "Nessun archivio attivo",
         body: "Importa un file ODS per attivare il dataset locale e sbloccare consultazione, ricerca ed export.",
@@ -357,6 +407,362 @@ export async function updateTitleRecord(existingTitle, variantIndex, payload) {
   };
 
   const nextStorage = rebuildStorageWithTitles(currentStorage, titles);
+  await writeStoredPayload(nextStorage);
+  return buildDashboardPayload(nextStorage);
+}
+
+function findEndOfCentralDirectory(bytes) {
+  for (let index = bytes.length - 22; index >= 0; index -= 1) {
+    if (
+      bytes[index] === 0x50 &&
+      bytes[index + 1] === 0x4b &&
+      bytes[index + 2] === 0x05 &&
+      bytes[index + 3] === 0x06
+    ) {
+      return index;
+    }
+  }
+  throw new Error("ODS file is missing ZIP central directory.");
+}
+
+function parseZipEntries(arrayBuffer) {
+  const bytes = new Uint8Array(arrayBuffer);
+  const view = new DataView(arrayBuffer);
+  const eocdOffset = findEndOfCentralDirectory(bytes);
+  const centralDirectorySize = view.getUint32(eocdOffset + 12, true);
+  const centralDirectoryOffset = view.getUint32(eocdOffset + 16, true);
+  const entries = [];
+  let cursor = centralDirectoryOffset;
+  const centralDirectoryEnd = centralDirectoryOffset + centralDirectorySize;
+  const decoder = new TextDecoder("utf-8");
+
+  while (cursor < centralDirectoryEnd) {
+    if (view.getUint32(cursor, true) !== 0x02014b50) {
+      throw new Error("ODS ZIP central directory is malformed.");
+    }
+
+    const compressionMethod = view.getUint16(cursor + 10, true);
+    const compressedSize = view.getUint32(cursor + 20, true);
+    const fileNameLength = view.getUint16(cursor + 28, true);
+    const extraFieldLength = view.getUint16(cursor + 30, true);
+    const fileCommentLength = view.getUint16(cursor + 32, true);
+    const localHeaderOffset = view.getUint32(cursor + 42, true);
+    const fileNameBytes = bytes.slice(cursor + 46, cursor + 46 + fileNameLength);
+    const fileName = decoder.decode(fileNameBytes);
+
+    entries.push({
+      compressionMethod,
+      compressedSize,
+      fileName,
+      localHeaderOffset,
+    });
+
+    cursor += 46 + fileNameLength + extraFieldLength + fileCommentLength;
+  }
+
+  return entries;
+}
+
+async function inflateRaw(bytes) {
+  if (typeof DecompressionStream !== "function") {
+    throw new Error("Il browser non supporta DecompressionStream; import ODS non disponibile.");
+  }
+
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  const inflatedBuffer = await new Response(stream).arrayBuffer();
+  return new Uint8Array(inflatedBuffer);
+}
+
+async function readZipEntryText(file, entryName) {
+  const arrayBuffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+  const view = new DataView(arrayBuffer);
+  const entry = parseZipEntries(arrayBuffer).find((candidate) => candidate.fileName === entryName);
+
+  if (!entry) {
+    throw new Error(`ODS archive is missing ${entryName}.`);
+  }
+
+  const localHeaderOffset = entry.localHeaderOffset;
+  if (view.getUint32(localHeaderOffset, true) !== 0x04034b50) {
+    throw new Error(`ODS archive entry ${entryName} has an invalid local header.`);
+  }
+
+  const fileNameLength = view.getUint16(localHeaderOffset + 26, true);
+  const extraFieldLength = view.getUint16(localHeaderOffset + 28, true);
+  const dataOffset = localHeaderOffset + 30 + fileNameLength + extraFieldLength;
+  const compressedBytes = bytes.slice(dataOffset, dataOffset + entry.compressedSize);
+
+  let outputBytes;
+  if (entry.compressionMethod === 0) {
+    outputBytes = compressedBytes;
+  } else if (entry.compressionMethod === 8) {
+    outputBytes = await inflateRaw(compressedBytes);
+  } else {
+    throw new Error(`Unsupported ODS compression method ${entry.compressionMethod}.`);
+  }
+
+  return new TextDecoder("utf-8").decode(outputBytes);
+}
+
+function firstElementByTagNameNS(parent, namespace, localName) {
+  const matches = parent.getElementsByTagNameNS(namespace, localName);
+  return matches.length ? matches[0] : null;
+}
+
+function parseRepeatCount(rawValue, context) {
+  if (rawValue == null || rawValue === "") {
+    return 1;
+  }
+
+  const parsedValue = Number.parseInt(rawValue, 10);
+  if (!Number.isInteger(parsedValue) || parsedValue < 1) {
+    throw new Error(`Invalid ${context}: ${JSON.stringify(rawValue)}`);
+  }
+  return parsedValue;
+}
+
+function extractCellText(cell) {
+  const paragraphs = [...cell.getElementsByTagNameNS(XML_NAMESPACES.text, "p")]
+    .map((paragraph) => paragraph.textContent.trim())
+    .filter((value) => value !== "");
+
+  if (paragraphs.length) {
+    return paragraphs.join("\n");
+  }
+
+  return (cell.getAttributeNS(XML_NAMESPACES.office, "value") || "").trim();
+}
+
+function parseRowCells(row, rowIndex) {
+  const values = [];
+  let cellIndex = 0;
+
+  for (const cell of row.children) {
+    if (
+      cell.namespaceURI !== XML_NAMESPACES.table ||
+      (cell.localName !== "table-cell" && cell.localName !== "covered-table-cell")
+    ) {
+      continue;
+    }
+
+    cellIndex += 1;
+    const repeatedCells = parseRepeatCount(
+      cell.getAttributeNS(XML_NAMESPACES.table, "number-columns-repeated"),
+      `cell ${cellIndex} number-columns-repeated`,
+    );
+    const cellText = extractCellText(cell);
+    for (let repeatIndex = 0; repeatIndex < repeatedCells; repeatIndex += 1) {
+      values.push(cellText);
+    }
+  }
+
+  while (values.length && values[values.length - 1] === "") {
+    values.pop();
+  }
+
+  if (!values.some((value) => value !== "")) {
+    return null;
+  }
+
+  return values;
+}
+
+function extractNonEmptyRows(sheet) {
+  const rows = [];
+  const tableRows = [...sheet.children].filter(
+    (node) => node.namespaceURI === XML_NAMESPACES.table && node.localName === "table-row",
+  );
+
+  tableRows.forEach((row, index) => {
+    const repeatedRows = parseRepeatCount(
+      row.getAttributeNS(XML_NAMESPACES.table, "number-rows-repeated"),
+      `row ${index + 1} number-rows-repeated`,
+    );
+    const parsedRow = parseRowCells(row, index + 1);
+    if (!parsedRow) {
+      return;
+    }
+    for (let repeatIndex = 0; repeatIndex < repeatedRows; repeatIndex += 1) {
+      rows.push([...parsedRow]);
+    }
+  });
+
+  return rows;
+}
+
+async function parseListaWorkbookFile(file) {
+  if (!(file instanceof File)) {
+    throw new Error("Seleziona un file ODS valido prima di continuare.");
+  }
+  const fileName = file.name || "archivio.ods";
+  const isOdsLike =
+    fileName.toLowerCase().endsWith(".ods") || file.type === "" || file.type === ODS_MIME_TYPE;
+  if (!isOdsLike) {
+    throw new Error("Il file selezionato non sembra un archivio ODS.");
+  }
+
+  const contentXml = await readZipEntryText(file, "content.xml");
+  const xml = new DOMParser().parseFromString(contentXml, "application/xml");
+  if (xml.querySelector("parsererror")) {
+    throw new Error("ODS content.xml non e' XML valido.");
+  }
+
+  const body = firstElementByTagNameNS(xml, XML_NAMESPACES.office, "body");
+  const spreadsheet = body && firstElementByTagNameNS(body, XML_NAMESPACES.office, "spreadsheet");
+  if (!spreadsheet) {
+    throw new Error("ODS content.xml non contiene office:spreadsheet.");
+  }
+
+  const sheets = [...spreadsheet.children].filter(
+    (node) => node.namespaceURI === XML_NAMESPACES.table && node.localName === "table",
+  );
+  if (!sheets.length) {
+    throw new Error("ODS workbook contains no sheets.");
+  }
+
+  const firstSheet = sheets[0];
+  const firstSheetName = firstSheet.getAttributeNS(XML_NAMESPACES.table, "name") || "";
+  if (firstSheetName !== "Lista") {
+    throw new Error(`First sheet must be named 'Lista'; found ${JSON.stringify(firstSheetName)}`);
+  }
+
+  const listaRows = extractNonEmptyRows(firstSheet);
+  return {
+    sourceName: fileName,
+    listaRows,
+  };
+}
+
+function normalizeListaRows(listaRows) {
+  const groupedRows = new Map();
+  let previousTitle = null;
+
+  listaRows.forEach((rawRow, sourceRowIndex) => {
+    if (!Array.isArray(rawRow) || rawRow.length !== 5) {
+      throw new Error(
+        `Row ${sourceRowIndex + 1} must contain exactly 5 columns; found ${rawRow.length}`,
+      );
+    }
+
+    const [titolo, piattaforma, edizioneVersione, supporto, stato] = rawRow;
+    const normalizedTitle = titolo.trim();
+
+    let effectiveTitle = normalizedTitle;
+    if (normalizedTitle) {
+      previousTitle = normalizedTitle;
+    } else if (previousTitle == null) {
+      throw new Error(
+        `Row ${sourceRowIndex + 1} has a blank title before any title context exists`,
+      );
+    } else {
+      effectiveTitle = previousTitle;
+    }
+
+    if (!groupedRows.has(effectiveTitle)) {
+      groupedRows.set(effectiveTitle, []);
+    }
+    groupedRows.get(effectiveTitle).push({
+      titolo: effectiveTitle,
+      piattaforma,
+      edizioneVersione,
+      supporto,
+      stato,
+    });
+  });
+
+  return [...groupedRows.entries()].map(([titolo, rows]) => ({
+    titolo,
+    sottoVarianti: rows.map((row) => ({
+      piattaforma: row.piattaforma.trim(),
+      edizioneVersione: row.edizioneVersione.trim(),
+      supporto: row.supporto.trim(),
+      stato: row.stato.trim(),
+    })),
+  }));
+}
+
+function buildStorageFromImportedTitles(storagePayload, titles, sourceName) {
+  const hasActiveArchive = Boolean(
+    storagePayload.activeArchive && storagePayload.activeArchive.metadata.archivioAttivo,
+  );
+
+  if (!hasActiveArchive) {
+    return {
+      schemaVersion: storagePayload.schemaVersion,
+      activeArchive: {
+        titles,
+        metadata: buildNextMetadata(titles.length),
+      },
+      pendingImport: null,
+    };
+  }
+
+  return {
+    schemaVersion: storagePayload.schemaVersion,
+    activeArchive: storagePayload.activeArchive,
+    pendingImport: {
+      sourceName,
+      stagedAt: new Date().toISOString(),
+      titles,
+    },
+  };
+}
+
+export async function importODSFile(file) {
+  const currentStorage = ensureStoragePayload(await readStoredPayload());
+  const parsedWorkbook = await parseListaWorkbookFile(file);
+  const importedTitles = normalizeListaRows(parsedWorkbook.listaRows);
+
+  if (!importedTitles.length) {
+    throw new Error("Il foglio Lista non contiene righe importabili.");
+  }
+
+  const nextStorage = buildStorageFromImportedTitles(
+    currentStorage,
+    importedTitles,
+    parsedWorkbook.sourceName,
+  );
+  await writeStoredPayload(nextStorage);
+
+  return {
+    dashboardPayload: buildDashboardPayload(nextStorage),
+    importSummary: {
+      sourceName: parsedWorkbook.sourceName,
+      rowCount: parsedWorkbook.listaRows.length,
+      titleCount: importedTitles.length,
+      requiresConfirmation: Boolean(nextStorage.pendingImport),
+    },
+  };
+}
+
+export async function resolvePendingImport(confirmed) {
+  if (typeof confirmed !== "boolean") {
+    throw new Error("confirmed must be a boolean");
+  }
+
+  const currentStorage = ensureStoragePayload(await readStoredPayload());
+  const pendingImport = currentStorage.pendingImport;
+
+  if (!pendingImport) {
+    throw new Error("Non esiste alcun import in attesa di conferma.");
+  }
+
+  const nextStorage = confirmed
+    ? {
+        schemaVersion: currentStorage.schemaVersion,
+        activeArchive: {
+          titles: pendingImport.titles,
+          metadata: buildNextMetadata(pendingImport.titles.length),
+        },
+        pendingImport: null,
+      }
+    : {
+        schemaVersion: currentStorage.schemaVersion,
+        activeArchive: currentStorage.activeArchive,
+        pendingImport: null,
+      };
+
   await writeStoredPayload(nextStorage);
   return buildDashboardPayload(nextStorage);
 }

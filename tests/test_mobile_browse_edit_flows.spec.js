@@ -14,6 +14,7 @@ const CHROMIUM_EXECUTABLE = path.join(
   "chrome-linux",
   "chrome",
 );
+const SAMPLE_ODS_PATH = path.join(__dirname, "..", ".local", "1001.ods");
 
 let serverProcess;
 
@@ -93,6 +94,12 @@ const FIXTURE_STORAGE = {
       },
     ],
   },
+  pendingImport: null,
+};
+
+const EMPTY_STORAGE = {
+  schemaVersion: "v1",
+  activeArchive: null,
   pendingImport: null,
 };
 
@@ -239,4 +246,44 @@ test("browser-only shell caches required assets and persisted archive remains us
   await expect(page.getByText("1 sotto-varianti in ordine sorgente preservato.")).toBeVisible();
 
   await page.context().setOffline(false);
+});
+
+test("import route accepts an ODS file and activates the archive when no dataset exists", async ({
+  page,
+}) => {
+  await seedArchiveStorage(page, EMPTY_STORAGE);
+  await page.goto(`${BASE_URL}/#/import`);
+
+  await page.locator("#import-file").setInputFiles(SAMPLE_ODS_PATH);
+  await page.getByRole("button", { name: "Leggi archivio" }).click();
+
+  await expect(page).toHaveURL(/#\/archive/);
+  await expect(page.locator("#archive-state")).toContainText("Archivio attivo");
+  await expect(page.locator("#archive-state")).toContainText("1049");
+  await expect(page.getByRole("link", { name: /Chrono Trigger/i })).toBeVisible();
+});
+
+test("import route stages overwrite confirmation before replacing an active archive", async ({
+  page,
+}) => {
+  await seedArchiveStorage(page);
+  await page.goto(`${BASE_URL}/#/import`);
+
+  await page.locator("#import-file").setInputFiles(SAMPLE_ODS_PATH);
+  await page.getByRole("button", { name: "Leggi archivio" }).click();
+
+  await expect(page.getByRole("heading", { name: "Conferma sostituzione archivio" })).toBeVisible();
+  await expect(page.locator("#route-preview")).toContainText("1001.ods");
+  await expect(page.locator("#route-preview")).toContainText("1049");
+
+  await page.getByRole("button", { name: "Annulla import" }).click();
+  await expect(page.getByRole("heading", { name: "Carica archivio dal foglio Lista" })).toBeVisible();
+
+  await page.locator("#import-file").setInputFiles(SAMPLE_ODS_PATH);
+  await page.getByRole("button", { name: "Leggi archivio" }).click();
+  await page.getByRole("button", { name: "Conferma sostituzione" }).click();
+
+  await expect(page).toHaveURL(/#\/archive/);
+  await expect(page.locator("#archive-state")).toContainText("1049");
+  await expect(page.getByRole("link", { name: /Chrono Trigger/i })).toBeVisible();
 });

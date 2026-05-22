@@ -1,5 +1,6 @@
 const DEPLOY_BASE_PATH = "__DEPLOY_BASE_PATH__";
-const CACHE_NAME = `archivio-1001-shell-v1-${DEPLOY_BASE_PATH}`;
+const CACHE_NAME =
+  DEPLOY_BASE_PATH === "/" ? "archivio-1001-shell-v1" : `archivio-1001-shell-v1-${DEPLOY_BASE_PATH}`;
 const SHELL_ASSETS = [
   DEPLOY_BASE_PATH,
   `${DEPLOY_BASE_PATH}index.html`,

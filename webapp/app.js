@@ -1,4 +1,10 @@
-import { createTitleRecord, loadDashboardPayload, updateTitleRecord } from "./storage.js";
+import {
+  createTitleRecord,
+  importODSFile,
+  loadDashboardPayload,
+  resolvePendingImport,
+  updateTitleRecord,
+} from "./storage.js";
 
 const DEPLOY_BASE_PATH = "__DEPLOY_BASE_PATH__";
 
@@ -483,6 +489,134 @@ function renderCreateRoute() {
   };
 }
 
+function renderImportRoute(archive) {
+  const preview = document.querySelector("#route-preview");
+  const pendingImport = archive.pendingImport;
+
+  if (pendingImport) {
+    preview.innerHTML = `
+      <div class="detail-header">
+        <div>
+          <p class="kicker">Import staged</p>
+          <h3>Conferma sostituzione archivio</h3>
+          <p>Il nuovo dataset e' stato letto dal foglio Lista ma non e' ancora attivo. Conferma la sostituzione completa dell'archivio locale corrente oppure annulla.</p>
+        </div>
+        <div class="detail-actions">
+          <a class="ghost-link" href="#/archive">Torna alla lista</a>
+        </div>
+      </div>
+      <div class="variant-card">
+        <dl class="variant-grid">
+          <div>
+            <dt>File sorgente</dt>
+            <dd>${pendingImport.sourceName}</dd>
+          </div>
+          <div>
+            <dt>Titoli in attesa</dt>
+            <dd>${pendingImport.titleCount}</dd>
+          </div>
+          <div>
+            <dt>Import messo in attesa</dt>
+            <dd>${formatTimestamp(pendingImport.stagedAt)}</dd>
+          </div>
+          <div>
+            <dt>Effetto</dt>
+            <dd>Sostituzione completa del dataset attivo</dd>
+          </div>
+        </dl>
+      </div>
+      <div class="form-actions dual-actions">
+        <button id="confirm-import" type="button">Conferma sostituzione</button>
+        <button id="cancel-import" class="secondary-action" type="button">Annulla import</button>
+      </div>
+      <p id="import-feedback" class="form-feedback" aria-live="polite"></p>
+    `;
+
+    const feedback = document.querySelector("#import-feedback");
+    document.querySelector("#confirm-import").onclick = async () => {
+      feedback.textContent = "Attivazione archivio in corso...";
+      try {
+        state.payload = await resolvePendingImport(true);
+        feedback.textContent = "";
+        window.location.hash = "#/archive";
+      } catch (error) {
+        feedback.textContent = error.message;
+      }
+    };
+
+    document.querySelector("#cancel-import").onclick = async () => {
+      feedback.textContent = "Annullamento import in corso...";
+      try {
+        state.payload = await resolvePendingImport(false);
+        feedback.textContent = "";
+        render(state.payload);
+      } catch (error) {
+        feedback.textContent = error.message;
+      }
+    };
+    return;
+  }
+
+  preview.innerHTML = `
+    <div class="detail-header">
+      <div>
+        <p class="kicker">Import ODS</p>
+        <h3>Carica archivio dal foglio Lista</h3>
+        <p>Seleziona un file ODS locale. Il primo foglio deve chiamarsi <strong>Lista</strong> e rispettare il contratto MVP a 5 colonne.</p>
+      </div>
+      <div class="detail-actions">
+        <a class="ghost-link" href="#/dashboard">Torna alla dashboard</a>
+      </div>
+    </div>
+    <form id="import-form" class="create-form">
+      <label>
+        <span>File ODS</span>
+        <input
+          id="import-file"
+          name="archiveFile"
+          type="file"
+          accept=".ods,application/vnd.oasis.opendocument.spreadsheet"
+          required
+        />
+      </label>
+      <div class="form-actions">
+        <button type="submit">Leggi archivio</button>
+      </div>
+      <p id="import-feedback" class="form-feedback" aria-live="polite"></p>
+    </form>
+  `;
+
+  const form = document.querySelector("#import-form");
+  const fileInput = document.querySelector("#import-file");
+  const feedback = document.querySelector("#import-feedback");
+
+  form.onsubmit = async (event) => {
+    event.preventDefault();
+    const file = fileInput.files && fileInput.files[0];
+
+    if (!file) {
+      feedback.textContent = "Seleziona un file ODS prima di continuare.";
+      return;
+    }
+
+    feedback.textContent = "Lettura archivio in corso...";
+
+    try {
+      const result = await importODSFile(file);
+      state.payload = result.dashboardPayload;
+      if (result.importSummary.requiresConfirmation) {
+        render(state.payload);
+        feedback.textContent = "";
+        return;
+      }
+      feedback.textContent = "";
+      window.location.hash = "#/archive";
+    } catch (error) {
+      feedback.textContent = error.message;
+    }
+  };
+}
+
 function renderPreview(appConfig, archive) {
   const preview = document.querySelector("#route-preview");
   const { routeId, params } = parseHash(state.currentRoute);
@@ -505,6 +639,11 @@ function renderPreview(appConfig, archive) {
 
   if (routeId === "create") {
     renderCreateRoute();
+    return;
+  }
+
+  if (routeId === "import") {
+    renderImportRoute(archive);
     return;
   }
 
@@ -591,8 +730,7 @@ async function bootstrap() {
 window.addEventListener("hashchange", () => {
   state.currentRoute = window.location.hash || "#/dashboard";
   if (state.payload) {
-    renderPreview(state.payload.app, state.payload.archive);
-    bindSearch(state.payload.search);
+    render(state.payload);
   }
 });
 
