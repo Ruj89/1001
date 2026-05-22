@@ -148,6 +148,24 @@ class ExportOperationalODSTests(unittest.TestCase):
             ),
         )
 
+    def test_export_preserves_blank_imported_variant_fields(self) -> None:
+        storage = build_active_local_archive_storage(
+            (
+                _title_record(
+                    "Puzzle Bobble",
+                    (("Neo Geo", "", "", ""),),
+                ),
+            ),
+            activated_at=__import__("datetime").datetime(2026, 5, 21, 20, 0, 0),
+        )
+
+        views = build_exported_workbook_views(storage)
+
+        self.assertEqual(
+            views.lista_rows,
+            (("Puzzle Bobble", "Neo Geo", "", "", ""),),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

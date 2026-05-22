@@ -64,7 +64,7 @@ class GenerateRisultatiViewTests(unittest.TestCase):
         with self.assertRaisesRegex(RisultatiGenerationError, "effective title"):
             generate_risultati_view(dataset)
 
-    def test_rejects_missing_stato(self) -> None:
+    def test_treats_missing_stato_as_non_ok_classification(self) -> None:
         dataset = NormalizedListaDataset(
             title_groups=(
                 NormalizedTitleGroup(
@@ -74,8 +74,13 @@ class GenerateRisultatiViewTests(unittest.TestCase):
             )
         )
 
-        with self.assertRaisesRegex(RisultatiGenerationError, "missing stato"):
-            generate_risultati_view(dataset)
+        self.assertEqual(
+            generate_risultati_view(dataset),
+            RisultatiView(
+                entries=(RisultatiEntry("Alpha", "-"),),
+                counts=RisultatiCounts(mancanti=1, ok=0, total=1),
+            ),
+        )
 
     def test_applies_documented_x_dash_rule_and_counts(self) -> None:
         dataset = NormalizedListaDataset(

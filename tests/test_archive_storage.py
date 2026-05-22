@@ -43,6 +43,20 @@ def _sample_title(title: str = "Chrono Trigger") -> TitoloRecord:
     )
 
 
+def _sample_imported_title_with_blank_fields(title: str = "Puzzle Bobble") -> TitoloRecord:
+    return TitoloRecord(
+        titolo=title,
+        sotto_varianti=(
+            SottoVarianteRecord(
+                piattaforma="Neo Geo",
+                edizione_versione="",
+                supporto="",
+                stato="",
+            ),
+        ),
+    )
+
+
 class LocalArchiveStorageTests(unittest.TestCase):
     def test_builds_empty_storage_with_current_schema_version(self) -> None:
         storage = build_empty_local_archive_storage()
@@ -96,6 +110,21 @@ class LocalArchiveStorageTests(unittest.TestCase):
             ),
             source_name="incoming.ods",
             titoli=(_sample_title("Terranigma"),),
+            staged_at=datetime(2026, 5, 21, 15, 0, 0),
+        )
+
+        restored = deserialize_local_archive_storage(serialize_local_archive_storage(storage))
+
+        self.assertEqual(restored, storage)
+
+    def test_serialization_round_trip_preserves_blank_imported_variant_fields(self) -> None:
+        storage = stage_pending_import(
+            build_active_local_archive_storage(
+                (_sample_imported_title_with_blank_fields(),),
+                activated_at=datetime(2026, 5, 21, 14, 0, 0),
+            ),
+            source_name="incoming.ods",
+            titoli=(_sample_imported_title_with_blank_fields("Terranigma"),),
             staged_at=datetime(2026, 5, 21, 15, 0, 0),
         )
 
@@ -244,6 +273,49 @@ class LocalArchiveStorageTests(unittest.TestCase):
         self.assertEqual(variant.piattaforma, "Nintendo DS")
         self.assertEqual(variant.stato, "Da comprare")
         self.assertEqual(updated.metadata.ultima_modifica_locale, datetime(2026, 5, 21, 17, 30, 0))
+
+    def test_rejects_incomplete_write_time_variants_for_create_and_update(self) -> None:
+        storage = build_active_local_archive_storage(
+            (_sample_title("Chrono Trigger"),),
+            activated_at=datetime(2026, 5, 21, 14, 0, 0),
+        )
+
+        incomplete_variant = SottoVarianteRecord(
+            piattaforma="Nintendo DS",
+            edizione_versione="",
+            supporto="cartuccia",
+            stato="Da comprare",
+        )
+
+        with self.assertRaisesRegex(ValueError, "edizione_versione"):
+            update_sub_variant_record(
+                storage,
+                title="Chrono Trigger",
+                variant_index=0,
+                updated_variant=incomplete_variant,
+                updated_at=datetime(2026, 5, 21, 17, 30, 0),
+            )
+
+        with self.assertRaisesRegex(ValueError, "edizione_versione"):
+            create_title_record(
+                storage,
+                new_title=TitoloRecord(
+                    titolo="Terranigma",
+                    sotto_varianti=(incomplete_variant,),
+                ),
+                created_at=datetime(2026, 5, 21, 18, 0, 0),
+            )
+
+        with self.assertRaisesRegex(ValueError, "edizione_versione"):
+            update_title_record(
+                storage,
+                existing_title="Chrono Trigger",
+                updated_title=TitoloRecord(
+                    titolo="Chrono Trigger DS",
+                    sotto_varianti=(incomplete_variant,),
+                ),
+                updated_at=datetime(2026, 5, 21, 18, 15, 0),
+            )
 
     def test_creates_new_title_and_increments_record_count(self) -> None:
         storage = build_active_local_archive_storage(

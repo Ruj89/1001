@@ -44,8 +44,6 @@ def generate_risultati_view(dataset: NormalizedListaDataset) -> RisultatiView:
         if not titolo:
             raise RisultatiGenerationError("Normalized title group is missing an effective title")
         statuses = tuple(row.stato.strip() for row in group.rows)
-        if any(not status for status in statuses):
-            raise RisultatiGenerationError(f"Normalized title group {titolo!r} has a missing stato")
 
         if any(status == "OK" for status in statuses) or all(
             status in {"Uscito fuori", "Non reperibile"} for status in statuses

@@ -27,10 +27,6 @@ def generate_appoggio_rows(dataset: NormalizedListaDataset) -> tuple[AppoggioRow
                 raise AppoggioGenerationError(
                     f"Normalized row {row.source_row_index} is missing an effective title"
                 )
-            if not row.stato.strip():
-                raise AppoggioGenerationError(
-                    f"Normalized row {row.source_row_index} is missing stato"
-                )
             projected_rows.append(
                 AppoggioRow(
                     source_row_index=row.source_row_index,

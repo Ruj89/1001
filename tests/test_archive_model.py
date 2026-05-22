@@ -38,7 +38,20 @@ class SottoVarianteRecordTests(unittest.TestCase):
             ),
         )
 
-    def test_rejects_blank_required_fields(self) -> None:
+    def test_preserves_blank_fields_for_imported_legacy_data(self) -> None:
+        record = SottoVarianteRecord(
+            piattaforma=" ",
+            edizione_versione="PAL",
+            supporto=" ",
+            stato="ok",
+        )
+
+        self.assertEqual(record.piattaforma, "")
+        self.assertEqual(record.edizione_versione, "PAL")
+        self.assertEqual(record.supporto, "")
+        self.assertEqual(record.stato, "ok")
+
+    def test_require_complete_rejects_blank_write_time_fields(self) -> None:
         invalid_cases = (
             ("piattaforma", dict(piattaforma=" ", edizione_versione="PAL", supporto="cartuccia", stato="ok")),
             ("edizione_versione", dict(piattaforma="NES", edizione_versione=" ", supporto="cartuccia", stato="ok")),
@@ -49,7 +62,7 @@ class SottoVarianteRecordTests(unittest.TestCase):
         for expected_field, payload in invalid_cases:
             with self.subTest(field=expected_field):
                 with self.assertRaisesRegex(ValueError, expected_field):
-                    SottoVarianteRecord(**payload)
+                    SottoVarianteRecord(**payload).require_complete()
 
     def test_is_deeply_immutable(self) -> None:
         record = SottoVarianteRecord(

@@ -73,7 +73,7 @@ class GenerateAppoggioRowsTests(unittest.TestCase):
             [1, 3, 5],
         )
 
-    def test_rejects_invalid_normalized_rows(self) -> None:
+    def test_preserves_blank_stato_values_from_normalized_rows(self) -> None:
         dataset = NormalizedListaDataset(
             title_groups=(
                 NormalizedTitleGroup(
@@ -86,8 +86,13 @@ class GenerateAppoggioRowsTests(unittest.TestCase):
             )
         )
 
-        with self.assertRaisesRegex(AppoggioGenerationError, "missing stato"):
-            generate_appoggio_rows(dataset)
+        self.assertEqual(
+            generate_appoggio_rows(dataset),
+            (
+                AppoggioRow(0, "Alpha", "OK"),
+                AppoggioRow(1, "Alpha", "   "),
+            ),
+        )
 
     def test_sample_workbook_generates_documented_projection_not_sample_defect(self) -> None:
         sample_path = Path(__file__).resolve().parents[1] / ".local" / "1001.ods"

@@ -1,6 +1,6 @@
 # T-03 Define local domain model and archive metadata
 
-Status: `accepted`
+Status: `completed`
 
 Objective: Fissare il contratto dominio minimo per `Titolo`, `Sotto-variante` e metadata archivio coerente sia con i dati legacy importati dal workbook reale sia con i flussi di scrittura MVP.
 
@@ -8,7 +8,7 @@ Objective: Fissare il contratto dominio minimo per `Titolo`, `Sotto-variante` e 
 
 Questo task definisce il contratto dominio minimo su cui devono convergere import, normalizzazione, persistenza locale, UI e export. Il record primario dell'MVP non e' la riga del foglio ma un `Titolo` che contiene una collezione ordinata di `Sotto-varianti`.
 
-La decisione aggiornata e' che i dati legacy importati possono contenere valori vuoti nei quattro campi non-title di una sotto-variante. Il dominio applicativo deve poterli preservare. Allo stesso tempo, i flussi di creazione e modifica MVP possono continuare a richiedere quattro campi valorizzati prima di salvare dati user-authored. Questo task definisce quindi un contratto dominio che separa chiaramente la rappresentazione dell'archivio importato dalle regole di validazione write-time.
+La decisione aggiornata e' che i dati legacy importati possono contenere valori vuoti nei quattro campi non-title di una sotto-variante. Il dominio applicativo deve poterli preservare. Allo stesso tempo, i flussi di creazione e modifica MVP continuano a richiedere quattro campi valorizzati prima di salvare dati user-authored. Il task e' ora implementato con una separazione esplicita tra rappresentazione del record importato e validazione write-time.
 
 ## Canonical Contract
 
@@ -53,10 +53,10 @@ La decisione aggiornata e' che i dati legacy importati possono contenere valori 
 
 ## Subtasks
 
-- `ST-03.1` Define the primary `Titolo` record shape. Status: `accepted`
-- `ST-03.2` Define imported-versus-write-time field rules for `Sotto-variante`. Status: `accepted`
+- `ST-03.1` Define the primary `Titolo` record shape. Status: `completed`
+- `ST-03.2` Define imported-versus-write-time field rules for `Sotto-variante`. Status: `completed`
 - `ST-03.3` Define archive metadata fields for active dataset state. Status: `completed`
-- `ST-03.4` Align model constraints with import, editing, storage, and export needs. Status: `accepted`
+- `ST-03.4` Align model constraints with import, editing, storage, and export needs. Status: `completed`
 
 ## Subtask Details And Dependencies
 
@@ -79,6 +79,15 @@ Blocks:
 - `EP-02 / T-01`
 - `EP-03 / T-03`
 - `EP-04 / T-03`
+
+Status:
+
+- `completed`
+
+Evidence:
+
+- Implemented in [src/archive_model.py](/root/bed-project/src/archive_model.py)
+- Verified by [tests/test_archive_model.py](/root/bed-project/tests/test_archive_model.py)
 
 ### ST-03.2 Define imported-versus-write-time field rules for `Sotto-variante`
 
@@ -103,6 +112,17 @@ Blocks:
 - `EP-03 / T-04`
 - `EP-04 / T-01`
 - `EP-04 / T-03`
+
+Status:
+
+- `completed`
+
+Evidence:
+
+- Implemented in [src/archive_model.py](/root/bed-project/src/archive_model.py)
+- Enforced in [src/archive_storage.py](/root/bed-project/src/archive_storage.py)
+- Verified by [tests/test_archive_model.py](/root/bed-project/tests/test_archive_model.py)
+- Verified by [tests/test_archive_storage.py](/root/bed-project/tests/test_archive_storage.py)
 
 ### ST-03.3 Define archive metadata fields for active dataset state
 
@@ -154,6 +174,23 @@ Blocks:
 - `EP-04 / T-01`
 - `EP-04 / T-02`
 - `EP-04 / T-03`
+
+Status:
+
+- `completed`
+
+Evidence:
+
+- Implemented in [src/archive_model.py](/root/bed-project/src/archive_model.py)
+- Consumed by [src/archive_storage.py](/root/bed-project/src/archive_storage.py)
+- Consumed by [src/appoggio_view.py](/root/bed-project/src/appoggio_view.py)
+- Consumed by [src/risultati_view.py](/root/bed-project/src/risultati_view.py)
+- Consumed by [src/ods_export.py](/root/bed-project/src/ods_export.py)
+- Verified by [tests/test_archive_model.py](/root/bed-project/tests/test_archive_model.py)
+- Verified by [tests/test_archive_storage.py](/root/bed-project/tests/test_archive_storage.py)
+- Verified by [tests/test_appoggio_view.py](/root/bed-project/tests/test_appoggio_view.py)
+- Verified by [tests/test_risultati_view.py](/root/bed-project/tests/test_risultati_view.py)
+- Verified by [tests/test_ods_export.py](/root/bed-project/tests/test_ods_export.py)
 
 ## Downstream Task Impact
 

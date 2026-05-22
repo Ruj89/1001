@@ -7,7 +7,11 @@ from typing import Iterable
 
 @dataclass(frozen=True, slots=True, init=False)
 class SottoVarianteRecord:
-    """Canonical MVP sub-variant with the 4 required archive fields."""
+    """Canonical MVP sub-variant with four canonical archive fields.
+
+    Imported legacy data may preserve blank field values. Write-time flows can
+    enforce completeness explicitly through ``require_complete``.
+    """
 
     piattaforma: str
     edizione_versione: str
@@ -26,19 +30,20 @@ class SottoVarianteRecord:
         normalized_supporto = supporto.strip()
         normalized_stato = stato.strip()
 
-        if not normalized_piattaforma:
-            raise ValueError("piattaforma must be a non-blank string")
-        if not normalized_edizione_versione:
-            raise ValueError("edizione_versione must be a non-blank string")
-        if not normalized_supporto:
-            raise ValueError("supporto must be a non-blank string")
-        if not normalized_stato:
-            raise ValueError("stato must be a non-blank string")
-
         object.__setattr__(self, "piattaforma", normalized_piattaforma)
         object.__setattr__(self, "edizione_versione", normalized_edizione_versione)
         object.__setattr__(self, "supporto", normalized_supporto)
         object.__setattr__(self, "stato", normalized_stato)
+
+    def require_complete(self) -> None:
+        if not self.piattaforma:
+            raise ValueError("piattaforma must be a non-blank string for write operations")
+        if not self.edizione_versione:
+            raise ValueError("edizione_versione must be a non-blank string for write operations")
+        if not self.supporto:
+            raise ValueError("supporto must be a non-blank string for write operations")
+        if not self.stato:
+            raise ValueError("stato must be a non-blank string for write operations")
 
 
 @dataclass(frozen=True, slots=True, init=False)

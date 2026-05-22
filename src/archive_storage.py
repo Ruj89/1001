@@ -217,6 +217,7 @@ def update_title_record(
         raise ValueError("existing_title must be a non-blank string")
     if not isinstance(updated_title, TitoloRecord):
         raise TypeError("updated_title must be a TitoloRecord")
+    _require_complete_title_record(updated_title)
 
     current_titles = list(_require_active_titles(storage))
     target_index = _find_title_index(current_titles, normalized_existing_title)
@@ -246,6 +247,7 @@ def update_sub_variant_record(
         raise ValueError("variant_index must be zero or greater")
     if not isinstance(updated_variant, SottoVarianteRecord):
         raise TypeError("updated_variant must be a SottoVarianteRecord")
+    updated_variant.require_complete()
 
     current_titles = list(_require_active_titles(storage))
     target_index = _find_title_index(current_titles, normalized_title)
@@ -273,6 +275,7 @@ def create_title_record(
 ) -> LocalArchiveStorage:
     if not isinstance(new_title, TitoloRecord):
         raise TypeError("new_title must be a TitoloRecord")
+    _require_complete_title_record(new_title)
 
     current_titles = list(storage.active_titles)
     _ensure_no_duplicate_title(current_titles, candidate_title=new_title.titolo, ignored_index=None)
@@ -508,6 +511,11 @@ def _ensure_no_duplicate_title(
             raise ArchiveStorageMutationError(
                 f"title {candidate_title!r} already exists in active archive"
             )
+
+
+def _require_complete_title_record(title: TitoloRecord) -> None:
+    for variant in title.sotto_varianti:
+        variant.require_complete()
 
 
 def _rebuild_active_storage(
