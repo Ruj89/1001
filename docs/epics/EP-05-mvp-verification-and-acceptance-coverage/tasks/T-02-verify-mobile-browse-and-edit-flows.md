@@ -1,6 +1,6 @@
 # T-02 Verify mobile browse and edit flows
 
-Status: `accepted`
+Status: `completed`
 
 Objective: Definire il contratto di verifica Android per dashboard, lista, ricerca, filtri, dettaglio, creazione e modifica persistita, con avvio esplicito solo dopo l'esistenza di tutti i flussi UI runnable richiesti.
 
@@ -51,10 +51,10 @@ La verifica e' downstream rispetto a `EP-03`. Deve partire solo quando dashboard
 
 ## Subtasks
 
-- `ST-02.1` Verify dashboard-first entry, quick actions, and archive status behavior on Android-sized viewports. Status: `accepted`
-- `ST-02.2` Verify local title search and full-status filtering, including missing-status discoverability. Status: `accepted`
-- `ST-02.3` Verify read-first detail, ordered sub-variants, explicit edit entry, and visible missing imported values. Status: `accepted`
-- `ST-02.4` Verify create and update flows on phone-sized viewports with coherent post-save behavior. Status: `accepted`
+- `ST-02.1` Verify dashboard-first entry, quick actions, and archive status behavior on Android-sized viewports. Status: `completed`
+- `ST-02.2` Verify local title search and full-status filtering, including missing-status discoverability. Status: `completed`
+- `ST-02.3` Verify read-first detail, ordered sub-variants, explicit edit entry, and visible missing imported values. Status: `completed`
+- `ST-02.4` Verify create and update flows on phone-sized viewports with coherent post-save behavior. Status: `completed`
 
 ## Subtask Details And Dependencies
 
@@ -75,6 +75,15 @@ Blocks:
 - `ST-02.3`
 - `ST-02.4`
 
+Status:
+
+- `completed`
+
+Evidence:
+
+- Verified by [tests/test_mobile_browse_edit_flows.spec.js](/root/bed-project/tests/test_mobile_browse_edit_flows.spec.js)
+- Fixture server provided by [tests/run_dashboard_fixture.py](/root/bed-project/tests/run_dashboard_fixture.py)
+
 ### ST-02.2 Verify local title search and full-status filtering, including missing-status discoverability
 
 Definition:
@@ -92,6 +101,15 @@ Blocks:
 - `ST-02.3`
 - `ST-02.4`
 
+Status:
+
+- `completed`
+
+Evidence:
+
+- Verified by [tests/test_mobile_browse_edit_flows.spec.js](/root/bed-project/tests/test_mobile_browse_edit_flows.spec.js)
+- Fixture server provided by [tests/run_dashboard_fixture.py](/root/bed-project/tests/run_dashboard_fixture.py)
+
 ### ST-02.3 Verify read-first detail, ordered sub-variants, explicit edit entry, and visible missing imported values
 
 Definition:
@@ -107,6 +125,15 @@ Depends on:
 Blocks:
 
 - `ST-02.4`
+
+Status:
+
+- `completed`
+
+Evidence:
+
+- Verified by [tests/test_mobile_browse_edit_flows.spec.js](/root/bed-project/tests/test_mobile_browse_edit_flows.spec.js)
+- Fixture server provided by [tests/run_dashboard_fixture.py](/root/bed-project/tests/run_dashboard_fixture.py)
 
 ### ST-02.4 Verify create and update flows on phone-sized viewports with coherent post-save behavior
 
@@ -125,6 +152,15 @@ Depends on:
 Blocks:
 
 - `none`
+
+Status:
+
+- `completed`
+
+Evidence:
+
+- Verified by [tests/test_mobile_browse_edit_flows.spec.js](/root/bed-project/tests/test_mobile_browse_edit_flows.spec.js)
+- Supporting mutation boundary checks in [tests/test_archive_dashboard_app.py](/root/bed-project/tests/test_archive_dashboard_app.py)
 
 ## Downstream Task Impact
 

@@ -1,6 +1,6 @@
 # EP-05 MVP verification and acceptance coverage
 
-Status: `proposed`
+Status: `completed`
 
 Objective: Definire il backlog minimo di verifica per confermare integrita' dati, usabilita' Android, copertura offline-first e allineamento con le acceptance criteria MVP.
 

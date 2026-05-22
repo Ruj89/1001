@@ -1,0 +1,10 @@
+{
+  "name": "bed-project",
+  "private": true,
+  "scripts": {
+    "test:mobile": "playwright test tests/test_mobile_browse_edit_flows.spec.js --reporter=line"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
+  }
+}
