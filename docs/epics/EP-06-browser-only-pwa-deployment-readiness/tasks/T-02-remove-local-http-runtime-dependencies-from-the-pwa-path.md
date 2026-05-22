@@ -1,6 +1,6 @@
 # T-02 Remove local HTTP runtime dependencies from the PWA path
 
-Status: `accepted`
+Status: `proposed`
 
 Objective: Spostare il percorso PWA target da runtime con server Python locale a runtime browser-only, preservando UI e flussi MVP gia' definiti.
 
@@ -14,6 +14,8 @@ Il task e' abbastanza definito per l'esecuzione e l'inventario minimo delle dipe
 - server Python locale che funge da boundary dati, bootstrap view-model e hosting statico nello stesso tempo.
 
 Questo task non ridefinisce UI o requisiti di prodotto. Definisce come migrare il boundary runtime dal server locale al browser-local persistence boundary gia' previsto dal progetto.
+
+L'esecuzione dei subtasks implementativi resta pero' bloccata finche' non viene congelato il boundary browser concreto che sostituisce il runtime Python locale. Il contratto `EP-02 / T-01` definisce il payload logico e il versionamento, ma dichiara esplicitamente di non decidere ancora la struttura fisica IndexedDB definitiva.
 
 ## Canonical Contract
 
