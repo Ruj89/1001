@@ -1,3 +1,5 @@
+import { createTitleRecord, loadDashboardPayload, updateTitleRecord } from "./storage.js";
+
 const state = {
   payload: null,
   currentRoute: window.location.hash || "#/dashboard",
@@ -38,41 +40,6 @@ function escapeHtmlAttribute(value) {
     .replaceAll('"', "&quot;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
-}
-
-async function createTitleRecord(payload) {
-  const response = await fetch("/api/titles", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const body = await response.json();
-  if (!response.ok) {
-    throw new Error(body.message || "Creazione non riuscita.");
-  }
-  return body;
-}
-
-async function updateTitleRecord(existingTitle, variantIndex, payload) {
-  const response = await fetch(
-    `/api/titles/${encodeURIComponent(existingTitle)}/variants/${variantIndex}`,
-    {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    },
-  );
-
-  const body = await response.json();
-  if (!response.ok) {
-    throw new Error(body.message || "Modifica non riuscita.");
-  }
-  return body;
 }
 
 function listStatusCounts(titles) {
@@ -609,8 +576,7 @@ function render(payload) {
 }
 
 async function bootstrap() {
-  const response = await fetch("/api/dashboard", { cache: "no-store" });
-  const payload = await response.json();
+  const payload = await loadDashboardPayload();
   render(payload);
 
   if ("serviceWorker" in navigator) {
@@ -630,7 +596,7 @@ bootstrap().catch(() => {
   document.querySelector("#archive-state").innerHTML = `
     <div class="empty-state">
       <h3>Shell non disponibile</h3>
-      <p>Il runtime locale non ha risposto. Riavvia il server della dashboard per continuare.</p>
+      <p>Il dataset locale non e' recuperabile. Ripristina la persistenza browser o riapri l'app su uno stato coerente.</p>
     </div>
   `;
 });

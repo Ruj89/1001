@@ -30,15 +30,7 @@ self.addEventListener("fetch", (event) => {
         return cached;
       }
 
-      return fetch(event.request)
-        .then((response) => {
-          if (event.request.url.includes("/api/dashboard")) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match("/index.html"));
+      return fetch(event.request).catch(() => caches.match("/index.html"));
     }),
   );
 });

@@ -20,7 +20,7 @@ let serverProcess;
 async function waitForServer() {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     try {
-      const response = await fetch(`${BASE_URL}/api/health`);
+      const response = await fetch(`${BASE_URL}/index.html`);
       if (response.ok) {
         return;
       }
@@ -41,7 +41,7 @@ test.use({
 test.beforeAll(async () => {
   serverProcess = spawn(
     "python3",
-    [path.join(__dirname, "run_dashboard_fixture.py"), "--host", HOST, "--port", String(PORT)],
+    [path.join(__dirname, "static_server.py"), "--host", HOST, "--port", String(PORT)],
     { stdio: "ignore" },
   );
   await waitForServer();
@@ -59,7 +59,73 @@ test.afterAll(async () => {
   });
 });
 
+const FIXTURE_STORAGE = {
+  schemaVersion: "v1",
+  activeArchive: {
+    metadata: {
+      archivioAttivo: true,
+      numeroRecord: 2,
+      ultimaModificaLocale: "2026-05-22T08:30:00",
+      versioneSchema: "v1",
+    },
+    titles: [
+      {
+        titolo: "Puzzle Bobble",
+        sottoVarianti: [
+          {
+            piattaforma: "Neo Geo",
+            edizioneVersione: "",
+            supporto: "",
+            stato: "",
+          },
+        ],
+      },
+      {
+        titolo: "Chrono Trigger",
+        sottoVarianti: [
+          {
+            piattaforma: "SNES",
+            edizioneVersione: "PAL",
+            supporto: "cartuccia",
+            stato: "OK",
+          },
+        ],
+      },
+    ],
+  },
+  pendingImport: null,
+};
+
+async function seedArchiveStorage(page, storagePayload = FIXTURE_STORAGE) {
+  await page.goto(BASE_URL);
+  await page.evaluate(async (payload) => {
+    const request = indexedDB.open("archivio-1001", 1);
+    const db = await new Promise((resolve, reject) => {
+      request.onupgradeneeded = () => {
+        const database = request.result;
+        if (!database.objectStoreNames.contains("runtime")) {
+          database.createObjectStore("runtime");
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction("runtime", "readwrite");
+      transaction.objectStore("runtime").put(payload, "archive-storage");
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+
+    db.close();
+  }, storagePayload);
+  await page.reload();
+}
+
 test("dashboard-first entry exposes quick actions, metadata, and primary search", async ({ page }) => {
+  await seedArchiveStorage(page);
   await page.goto(BASE_URL);
 
   await expect(page.getByRole("heading", { name: "Ricerca primaria" })).toBeVisible();
@@ -75,6 +141,7 @@ test("dashboard-first entry exposes quick actions, metadata, and primary search"
 });
 
 test("browse verification covers status filters and missing-status discoverability", async ({ page }) => {
+  await seedArchiveStorage(page);
   await page.goto(`${BASE_URL}/#/archive`);
 
   await page.locator("#status-filter").selectOption("__missing__");
@@ -89,6 +156,7 @@ test("browse verification covers status filters and missing-status discoverabili
 test("detail verification keeps read-first behavior, explicit edit entry, and visible missing values", async ({
   page,
 }) => {
+  await seedArchiveStorage(page);
   await page.goto(`${BASE_URL}/#/detail?title=Puzzle%20Bobble`);
 
   await expect(page.getByRole("heading", { name: "Puzzle Bobble" })).toBeVisible();
@@ -102,6 +170,7 @@ test("detail verification keeps read-first behavior, explicit edit entry, and vi
 });
 
 test("create and update flows keep detail, list, and validation feedback coherent", async ({ page }) => {
+  await seedArchiveStorage(page);
   await page.goto(`${BASE_URL}/#/edit?title=Puzzle%20Bobble&variant=0`);
 
   await page.locator('input[name="titolo"]').fill("Chrono Trigger");

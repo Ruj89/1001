@@ -10,6 +10,8 @@ Questo task non puo' partire da mock, wireframe o documenti statici. La verifica
 
 La verifica e' downstream rispetto a `EP-03`. Deve partire solo quando dashboard, lista/search/filter, dettaglio con ingresso in modifica, create flow e update flow persistito esistono in forma runnable su viewport phone-sized. Il focus resta l'usabilita' Android e la coerenza del prodotto, non la semplice presenza tecnica degli schermi.
 
+L'evidenza corrente di questo task gira su shell browser-only servita staticamente e persistenza browser-local seedata nei test, non piu' su una fixture che espone endpoint applicativi locali.
+
 ## Canonical Contract
 
 ### 1. Readiness gate
@@ -83,7 +85,7 @@ Status:
 Evidence:
 
 - Verified by [tests/test_mobile_browse_edit_flows.spec.js](/root/bed-project/tests/test_mobile_browse_edit_flows.spec.js)
-- Fixture server provided by [tests/run_dashboard_fixture.py](/root/bed-project/tests/run_dashboard_fixture.py)
+- Static browser shell served by [tests/static_server.py](/root/bed-project/tests/static_server.py)
 
 ### ST-02.2 Verify local title search and full-status filtering, including missing-status discoverability
 
@@ -109,7 +111,7 @@ Status:
 Evidence:
 
 - Verified by [tests/test_mobile_browse_edit_flows.spec.js](/root/bed-project/tests/test_mobile_browse_edit_flows.spec.js)
-- Fixture server provided by [tests/run_dashboard_fixture.py](/root/bed-project/tests/run_dashboard_fixture.py)
+- Static browser shell served by [tests/static_server.py](/root/bed-project/tests/static_server.py)
 
 ### ST-02.3 Verify read-first detail, ordered sub-variants, explicit edit entry, and visible missing imported values
 
@@ -134,7 +136,7 @@ Status:
 Evidence:
 
 - Verified by [tests/test_mobile_browse_edit_flows.spec.js](/root/bed-project/tests/test_mobile_browse_edit_flows.spec.js)
-- Fixture server provided by [tests/run_dashboard_fixture.py](/root/bed-project/tests/run_dashboard_fixture.py)
+- Static browser shell served by [tests/static_server.py](/root/bed-project/tests/static_server.py)
 
 ### ST-02.4 Verify create and update flows on phone-sized viewports with coherent post-save behavior
 
@@ -161,7 +163,7 @@ Status:
 Evidence:
 
 - Verified by [tests/test_mobile_browse_edit_flows.spec.js](/root/bed-project/tests/test_mobile_browse_edit_flows.spec.js)
-- Supporting mutation boundary checks in [tests/test_archive_dashboard_app.py](/root/bed-project/tests/test_archive_dashboard_app.py)
+- Static browser shell served by [tests/static_server.py](/root/bed-project/tests/static_server.py)
 
 ## Downstream Task Impact
 

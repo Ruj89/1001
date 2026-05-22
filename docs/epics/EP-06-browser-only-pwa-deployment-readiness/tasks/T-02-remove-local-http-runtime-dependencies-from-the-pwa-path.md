@@ -1,12 +1,14 @@
 # T-02 Remove local HTTP runtime dependencies from the PWA path
 
-Status: `accepted`
+Status: `completed`
 
 Objective: Spostare il percorso PWA target da runtime con server Python locale a runtime browser-only, preservando UI e flussi MVP gia' definiti.
 
 ## Decision
 
-Il task e' abbastanza definito per l'esecuzione e l'inventario minimo delle dipendenze bloccanti e' gia' verificabile nel codice attuale. Il percorso PWA target non puo' essere reso deployabile via hosting statico finche' la shell web continua a dipendere da:
+L'inventario minimo delle dipendenze bloccanti era verificabile nel codice iniziale. Questa iterazione chiude il task spostando la shell su runtime browser-only con adapter IndexedDB e rimuovendo la dipendenza dal boundary HTTP locale per bootstrap, create e update.
+
+Prima dell'implementazione, il percorso PWA target non poteva essere reso deployabile via hosting statico finche' la shell web continuava a dipendere da:
 
 - bootstrap `GET /api/dashboard`;
 - mutazioni `POST /api/titles` e `PUT /api/titles/...`;
@@ -102,7 +104,12 @@ Blocks:
 
 Status:
 
-- `accepted`
+- `completed`
+
+Evidence:
+
+- Implemented in [webapp/storage.js](/root/bed-project/webapp/storage.js) and consumed by [webapp/app.js](/root/bed-project/webapp/app.js)
+- Verified by [tests/test_mobile_browse_edit_flows.spec.js](/root/bed-project/tests/test_mobile_browse_edit_flows.spec.js)
 
 ### ST-02.3 Reindirizzare create e update flow verso write boundary locale browser-only
 
@@ -125,7 +132,12 @@ Blocks:
 
 Status:
 
-- `accepted`
+- `completed`
+
+Evidence:
+
+- Implemented in [webapp/storage.js](/root/bed-project/webapp/storage.js) and [webapp/app.js](/root/bed-project/webapp/app.js)
+- Verified by [tests/test_mobile_browse_edit_flows.spec.js](/root/bed-project/tests/test_mobile_browse_edit_flows.spec.js)
 
 ### ST-02.4 Garantire che shell, navigazione e stato vuoto/attivo restino avviabili offline senza server locale
 
@@ -148,10 +160,15 @@ Blocks:
 
 Status:
 
-- `accepted`
+- `completed`
+
+Evidence:
+
+- Implemented in [webapp/app.js](/root/bed-project/webapp/app.js) and [webapp/service-worker.js](/root/bed-project/webapp/service-worker.js)
+- Verified by [tests/test_mobile_browse_edit_flows.spec.js](/root/bed-project/tests/test_mobile_browse_edit_flows.spec.js)
 
 ## Downstream Task Impact
 
 - `EP-06 / T-03` must consume the browser-only bootstrap and write boundary assumptions fixed here.
-- `EP-07 / T-01` cannot publish a supported hosted release until `ST-02.4` is completed.
-- `EP-07 / T-02` cannot validate Android deployed behavior until create, update, and bootstrap no longer rely on the local Python runtime.
+- `EP-07 / T-01` can now define the provider-neutral HTTPS release procedure against a browser-only artifact path.
+- `EP-07 / T-02` can now validate Android deployed behavior without depending on the local Python runtime.
