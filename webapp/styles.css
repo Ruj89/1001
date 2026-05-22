@@ -395,16 +395,16 @@ dd {
 
 .filter-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
+  width: 100%;
 }
 
 .filter-actions button {
-  background: var(--accent);
-  color: #fff;
-  border-color: transparent;
-  padding: 0 12px;
+  width: 100%;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  border-color: var(--border);
+  padding: 0 4px;
 }
 
 .filter-suggestions {

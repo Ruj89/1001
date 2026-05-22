@@ -54,7 +54,7 @@ function listStatusCounts(titles) {
   const counts = new Map();
 
   for (const title of titles) {
-    for (const status of getTitleFilterStatuses(title)) {
+    for (const status of getTitleStatuses(title)) {
       counts.set(status, (counts.get(status) || 0) + 1);
     }
   }
@@ -123,7 +123,7 @@ function titleMatchesFilters(title, filters) {
   if (!matchesTitle) {
     return false;
   }
-  const titleStatuses = getTitleFilterStatuses(title);
+  const titleStatuses = getTitleFilterStatuses(title, filters.stato);
 
   if (filters.stato) {
     if (filters.stato === "__missing__" && !titleStatuses.includes("")) {
@@ -158,11 +158,23 @@ function titlesMatchingFilters(titles, filters) {
   return titles.filter((title) => titleMatchesFilters(title, filters));
 }
 
-function getTitleFilterStatuses(title) {
-  const statuses = title.sottoVarianti.map((variant) => (variant.stato || "").trim());
+function getTitleStatuses(title) {
+  return title.sottoVarianti.map((variant) => (variant.stato || "").trim());
+}
+
+function getTitleFilterStatuses(title, selectedStatus) {
+  const statuses = getTitleStatuses(title);
+
+  if (!selectedStatus) {
+    return [...new Set(statuses)];
+  }
 
   if (statuses.some((status) => status === "OK")) {
     return ["OK"];
+  }
+
+  if (statuses.some((status) => status === "Da studiare estrazione")) {
+    return ["Da studiare estrazione"];
   }
 
   return [...new Set(statuses)];
@@ -523,6 +535,12 @@ function renderArchiveRoute(archive, params) {
   document.querySelector("#clear-filters").onclick = () => {
     window.clearTimeout(state.archiveFilterTimerId);
     filterForm.reset();
+    if (statusFilter instanceof HTMLSelectElement) {
+      statusFilter.value = "";
+    }
+    if (platformInput instanceof HTMLInputElement) {
+      platformInput.value = "";
+    }
     if (platformSuggestions instanceof HTMLDivElement) {
       platformSuggestions.hidden = true;
     }
