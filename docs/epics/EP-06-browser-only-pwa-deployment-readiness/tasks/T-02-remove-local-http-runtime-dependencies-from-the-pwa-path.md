@@ -1,6 +1,6 @@
 # T-02 Remove local HTTP runtime dependencies from the PWA path
 
-Status: `proposed`
+Status: `accepted`
 
 Objective: Spostare il percorso PWA target da runtime con server Python locale a runtime browser-only, preservando UI e flussi MVP gia' definiti.
 
@@ -13,9 +13,7 @@ Il task e' abbastanza definito per l'esecuzione e l'inventario minimo delle dipe
 - service worker che intercetta ancora risposte HTTP del runtime locale;
 - server Python locale che funge da boundary dati, bootstrap view-model e hosting statico nello stesso tempo.
 
-Questo task non ridefinisce UI o requisiti di prodotto. Definisce come migrare il boundary runtime dal server locale al browser-local persistence boundary gia' previsto dal progetto.
-
-L'esecuzione dei subtasks implementativi resta pero' bloccata finche' non viene congelato il boundary browser concreto che sostituisce il runtime Python locale. Il contratto `EP-02 / T-01` definisce il payload logico e il versionamento, ma dichiara esplicitamente di non decidere ancora la struttura fisica IndexedDB definitiva.
+Questo task non ridefinisce UI o requisiti di prodotto. Definisce come migrare il boundary runtime dal server locale a un `adapter browser-local basato su IndexedDB`, coerente con il persistence model gia' previsto dal progetto.
 
 ## Canonical Contract
 
@@ -28,7 +26,7 @@ L'esecuzione dei subtasks implementativi resta pero' bloccata finche' non viene 
 
 ### 2. Browser-only bootstrap target
 
-- Dashboard, metadata archivio, stato vuoto e titoli attivi devono essere derivati da persistenza browser-local.
+- Dashboard, metadata archivio, stato vuoto e titoli attivi devono essere derivati da persistenza browser-local tramite adapter IndexedDB.
 - Il bootstrap deve poter aprire la shell anche senza rete e senza server locale.
 - Gli errori di recovery devono essere trattati come problemi del boundary dati locale, non come assenza di risposta HTTP.
 
@@ -41,6 +39,7 @@ L'esecuzione dei subtasks implementativi resta pero' bloccata finche' non viene 
 
 - Questo task non richiede di eliminare immediatamente il server Python dal repository.
 - Questo task non richiede ancora la procedura di publish su hosting specifico.
+- Questo task non riapre la discussione su `file://`, che resta fuori scope MVP.
 - Questo task deve preservare shell, route, comportamento dashboard-first e flussi MVP gia' verificati, salvo i cambi minimi necessari al cambio di runtime boundary.
 
 ## Subtasks
