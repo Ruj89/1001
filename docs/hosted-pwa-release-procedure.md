@@ -23,7 +23,7 @@ La procedura deve produrre sempre questi output osservabili:
 ## Prerequisiti
 
 - Il contenuto di `webapp/` deve restare browser-only e statico.
-- Il deploy deve servire l'app da root path `/` oppure da un dominio/subdominio dedicato.
+- Il deploy puo' servire l'app da root path `/` oppure da un sottopercorso come `/<repo>/`.
 - HTTPS e' obbligatorio.
 - Il server statico deve servire almeno:
   - `index.html`
@@ -36,7 +36,7 @@ La procedura deve produrre sempre questi output osservabili:
   - `icon-512.svg`
 - Il deploy non deve reintrodurre dipendenze dal server Python locale.
 
-Nota importante: l'asset routing corrente usa path assoluti (`/app.js`, `/manifest.webmanifest`, `/icon-192.svg`). Un deploy sotto sottopercorso non e' supportato da questa procedura.
+Nota importante: il build statico parametrizza i path pubblici tramite `DEPLOY_BASE_PATH`. Il default resta `/`; per GitHub Pages project site il valore atteso e' `/<repo>/`.
 
 ## 1. Preparazione artefatto
 
@@ -49,8 +49,21 @@ npm run build:pwa-release
 Il comando:
 
 - copia `webapp/` in `dist/pwa-release/`;
+- riscrive l'artefatto statico con il prefisso pubblico definito da `DEPLOY_BASE_PATH` se presente;
 - genera `release.json` con `releaseId`, revisione git e timestamp UTC;
 - crea uno snapshot compresso in `dist/releases/` per il rollback.
+
+Input opzionale:
+
+```bash
+DEPLOY_BASE_PATH=/1001/ npm run build:pwa-release
+```
+
+Regole del parametro:
+
+- default: `/`
+- valore normalizzato sempre con slash iniziale e finale
+- per GitHub Pages project site usare `/<repo>/`
 
 Controlli minimi prima del publish:
 
@@ -65,7 +78,7 @@ Controlli minimi prima del publish:
 Pubblicare il contenuto di `dist/pwa-release/` su un hosting statico HTTPS con queste regole:
 
 - l'URL finale deve essere pubblico e raggiungibile da Chrome Android;
-- il contenuto deve essere servito da root path `/`;
+- il contenuto deve essere servito dal path coerente con `DEPLOY_BASE_PATH`;
 - `manifest.webmanifest` deve essere servito con MIME type coerente;
 - `service-worker.js` deve essere raggiungibile dal browser senza redirect anomali;
 - gli aggiornamenti devono sostituire il contenuto statico in modo atomico o quasi-atomico.
@@ -115,11 +128,11 @@ Prima di dichiarare una release pronta per `EP-07 / T-02`, devono essere veri qu
 - il service worker puo' registrarsi nel contesto pubblicato;
 - la shell iniziale si apre senza dipendere da server Python locale;
 - il deploy espone gli asset essenziali richiesti dal service worker;
+- se il deploy usa un sottopercorso, il build deve essere stato generato con `DEPLOY_BASE_PATH` coerente;
 - il deploy resta esplicitamente fuori supporto per `file://`.
 
 ## Limiti espliciti
 
 - Questa procedura non seleziona un vendor specifico.
 - Questa procedura non copre ancora la validazione Android reale post-publish.
-- Questa procedura non rende supportato il deploy sotto sottopercorso.
 - Questa procedura non autorizza wrapper Android come percorso principale.

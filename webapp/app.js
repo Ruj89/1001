@@ -1,5 +1,7 @@
 import { createTitleRecord, loadDashboardPayload, updateTitleRecord } from "./storage.js";
 
+const DEPLOY_BASE_PATH = "__DEPLOY_BASE_PATH__";
+
 const state = {
   payload: null,
   currentRoute: window.location.hash || "#/dashboard",
@@ -580,7 +582,9 @@ async function bootstrap() {
   render(payload);
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/service-worker.js").catch(() => {});
+    navigator.serviceWorker
+      .register(`${DEPLOY_BASE_PATH}service-worker.js`, { scope: DEPLOY_BASE_PATH })
+      .catch(() => {});
   }
 }
 
