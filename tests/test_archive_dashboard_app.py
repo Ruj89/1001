@@ -50,6 +50,8 @@ class ArchiveDashboardPayloadTests(unittest.TestCase):
         self.assertTrue(payload["archive"]["hasActiveArchive"])
         self.assertEqual(payload["archive"]["metadata"]["numeroRecord"], 2)
         self.assertEqual(payload["archive"]["metadata"]["versioneSchema"], "v1")
+        self.assertEqual(len(payload["archive"]["activeTitles"]), 2)
+        self.assertEqual(payload["archive"]["activeTitles"][0]["titolo"], "Chrono Trigger")
         primary_routes = [route["id"] for route in payload["app"]["routes"] if route["primary"]]
         self.assertEqual(primary_routes, ["archive"])
 
@@ -80,4 +82,3 @@ class ArchiveDashboardServerTests(unittest.TestCase):
         self.assertTrue(payload["archive"]["hasActiveArchive"])
         self.assertIn("Archivio 1001", html)
         self.assertIn("Ricerca primaria", html)
-

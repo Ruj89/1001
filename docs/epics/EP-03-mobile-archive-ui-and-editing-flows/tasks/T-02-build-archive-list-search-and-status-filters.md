@@ -1,6 +1,6 @@
 # T-02 Build archive list search and status filters
 
-Status: `accepted`
+Status: `completed`
 
 Objective: Definire il contratto eseguibile per elenco titoli, ricerca locale e filtri stato mobile-first, compatibili sia con il vocabolario reale degli stati sia con eventuali valori importati mancanti.
 
@@ -46,10 +46,10 @@ La ricerca deve essere solo per titolo. Il filtro stato deve coprire tutti i val
 
 ## Subtasks
 
-- `ST-02.1` Render the title list for phone-sized viewports. Status: `accepted`
-- `ST-02.2` Implement local title-based search across the archive. Status: `accepted`
-- `ST-02.3` Implement status filtering for the full explicit status set and missing imported status values. Status: `accepted`
-- `ST-02.4` Provide faster access to the most common statuses without hiding rare ones. Status: `accepted`
+- `ST-02.1` Render the title list for phone-sized viewports. Status: `completed`
+- `ST-02.2` Implement local title-based search across the archive. Status: `completed`
+- `ST-02.3` Implement status filtering for the full explicit status set and missing imported status values. Status: `completed`
+- `ST-02.4` Provide faster access to the most common statuses without hiding rare ones. Status: `completed`
 
 ## Subtask Details And Dependencies
 

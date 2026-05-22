@@ -3,9 +3,14 @@ const state = {
   currentRoute: window.location.hash || "#/dashboard",
 };
 
-function routeIdFromHash(hashValue) {
-  const route = (hashValue || "#/dashboard").replace(/^#\//, "").split("?")[0];
-  return route || "dashboard";
+function parseHash(hashValue) {
+  const normalized = hashValue || "#/dashboard";
+  const [, fragment = "dashboard"] = normalized.split("#/");
+  const [routePart, queryPart = ""] = fragment.split("?");
+  return {
+    routeId: routePart || "dashboard",
+    params: new URLSearchParams(queryPart),
+  };
 }
 
 function formatTimestamp(timestamp) {
@@ -17,6 +22,50 @@ function formatTimestamp(timestamp) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(timestamp));
+}
+
+function normalizeStatusLabel(statusValue) {
+  return statusValue || "Stato mancante";
+}
+
+function listStatusCounts(titles) {
+  const counts = new Map();
+
+  for (const title of titles) {
+    const statuses = new Set(
+      title.sottoVarianti.map((variant) => variant.stato).filter((status) => status !== ""),
+    );
+
+    for (const status of statuses) {
+      counts.set(status, (counts.get(status) || 0) + 1);
+    }
+
+    if (title.sottoVarianti.some((variant) => variant.stato === "")) {
+      counts.set("", (counts.get("") || 0) + 1);
+    }
+  }
+
+  return [...counts.entries()].sort((left, right) => {
+    if (right[1] !== left[1]) {
+      return right[1] - left[1];
+    }
+    return normalizeStatusLabel(left[0]).localeCompare(normalizeStatusLabel(right[0]), "it");
+  });
+}
+
+function titlesMatchingFilters(titles, query, status) {
+  return titles.filter((title) => {
+    const matchesQuery = !query || title.titolo.toLowerCase().includes(query.toLowerCase());
+    const matchesStatus =
+      !status ||
+      title.sottoVarianti.some((variant) => {
+        if (status === "__missing__") {
+          return variant.stato === "";
+        }
+        return variant.stato === status;
+      });
+    return matchesQuery && matchesStatus;
+  });
 }
 
 function renderRoutes(routes) {
@@ -73,14 +122,128 @@ function renderArchiveState(archive) {
   `;
 }
 
-function renderPreview(appConfig) {
+function renderArchiveRoute(archive, params) {
   const preview = document.querySelector("#route-preview");
-  const routeId = routeIdFromHash(state.currentRoute);
+  const titles = archive.activeTitles || [];
+  const query = params.get("query") || "";
+  const selectedStatus = params.get("status") || "";
+  const filteredTitles = titlesMatchingFilters(titles, query, selectedStatus);
+  const statusCounts = listStatusCounts(titles);
+  const quickStatuses = statusCounts.slice(0, 4);
+  const selectedLabel =
+    selectedStatus === "__missing__" ? "Stato mancante" : normalizeStatusLabel(selectedStatus);
+
+  preview.innerHTML = `
+    <div class="archive-toolbar">
+      <div>
+        <strong>Vista archivio</strong>
+        <p>${filteredTitles.length} titoli visibili su ${titles.length}.</p>
+      </div>
+      <div class="toolbar-copy">
+        <span>Ricerca: ${query || "nessuna"}</span>
+        <span>Filtro stato: ${selectedStatus ? selectedLabel : "tutti"}</span>
+      </div>
+    </div>
+    <div class="status-shortcuts">
+      ${quickStatuses
+        .map(
+          ([status, count]) => `
+            <a class="status-chip" href="#/archive?status=${encodeURIComponent(status || "__missing__")}">
+              ${normalizeStatusLabel(status)} · ${count}
+            </a>
+          `,
+        )
+        .join("")}
+    </div>
+    <label class="filter-label" for="status-filter">Tutti gli stati</label>
+    <select id="status-filter" class="status-filter">
+      <option value="">Tutti gli stati</option>
+      ${statusCounts
+        .map(
+          ([status, count]) => `
+            <option value="${status || "__missing__"}" ${
+              (status || "__missing__") === selectedStatus ? "selected" : ""
+            }>
+              ${normalizeStatusLabel(status)} (${count})
+            </option>
+          `,
+        )
+        .join("")}
+    </select>
+    <div class="title-list">
+      ${
+        filteredTitles.length
+          ? filteredTitles
+              .map((title) => {
+                const titleStatuses = [
+                  ...new Set(
+                    title.sottoVarianti.map((variant) => normalizeStatusLabel(variant.stato)),
+                  ),
+                ];
+
+                return `
+                  <a class="title-card" href="#/detail?title=${encodeURIComponent(title.titolo)}">
+                    <div>
+                      <strong>${title.titolo}</strong>
+                      <p>${title.sottoVarianti.length} sotto-varianti</p>
+                    </div>
+                    <div class="status-pill-row">
+                      ${titleStatuses
+                        .map((statusLabel) => `<span class="status-pill">${statusLabel}</span>`)
+                        .join("")}
+                    </div>
+                  </a>
+                `;
+              })
+              .join("")
+          : `
+            <div class="empty-state">
+              <h3>Nessun risultato</h3>
+              <p>La ricerca per titolo e i filtri stato non hanno trovato titoli compatibili. Rimuovi o modifica i criteri per continuare.</p>
+            </div>
+          `
+      }
+    </div>
+  `;
+
+  document.querySelector("#status-filter").addEventListener("change", (event) => {
+    const nextStatus = event.target.value;
+    const nextParams = new URLSearchParams();
+    if (query) {
+      nextParams.set("query", query);
+    }
+    if (nextStatus) {
+      nextParams.set("status", nextStatus);
+    }
+    const nextHash = nextParams.toString() ? `#/archive?${nextParams.toString()}` : "#/archive";
+    window.location.hash = nextHash;
+  });
+}
+
+function renderPreview(appConfig, archive) {
+  const preview = document.querySelector("#route-preview");
+  const { routeId, params } = parseHash(state.currentRoute);
   const matchingRoute = appConfig.routes.find((route) => route.id === routeId);
+
+  if (routeId === "archive" && archive.hasActiveArchive) {
+    renderArchiveRoute(archive, params);
+    return;
+  }
+
+  if (routeId === "archive" && !archive.hasActiveArchive) {
+    preview.innerHTML = `
+      <div class="empty-state">
+        <h3>Lista non disponibile</h3>
+        <p>La superficie di browse e' pronta, ma serve prima un archivio attivo locale.</p>
+        <a class="ghost-link" href="#/import">Importa ODS</a>
+      </div>
+    `;
+    return;
+  }
 
   if (!matchingRoute) {
     preview.innerHTML = `
-      <p>Questa shell espone già le route future. La vista corrente non è ancora implementata, ma l'ingresso è stabilito.</p>
+      <p>Questa shell espone gia' le route future. La vista corrente non e' ancora implementata, ma l'ingresso e' stabilito.</p>
     `;
     return;
   }
@@ -95,18 +258,24 @@ function renderPreview(appConfig) {
 function bindSearch(searchConfig) {
   const input = document.querySelector("#search-input");
   const submit = document.querySelector("#search-submit");
+  const searchForm = document.querySelector("#search-form");
+  const { routeId, params } = parseHash(state.currentRoute);
   input.placeholder = searchConfig.placeholder;
   submit.textContent = searchConfig.submitLabel;
+  input.value = routeId === "archive" ? params.get("query") || "" : "";
 
-  document.querySelector("#search-form").addEventListener("submit", (event) => {
+  searchForm.onsubmit = (event) => {
     event.preventDefault();
     const query = input.value.trim();
-    const url = new URL(window.location.href);
-    url.hash = query
-      ? `${searchConfig.destinationHref}?query=${encodeURIComponent(query)}`
+    const nextParams = new URLSearchParams();
+    if (query) {
+      nextParams.set("query", query);
+    }
+    const nextHash = nextParams.toString()
+      ? `${searchConfig.destinationHref}?${nextParams.toString()}`
       : searchConfig.destinationHref;
-    window.location.hash = url.hash;
-  });
+    window.location.hash = nextHash;
+  };
 }
 
 function render(payload) {
@@ -115,7 +284,7 @@ function render(payload) {
   document.querySelector("#app-tagline").textContent = payload.app.tagline;
   renderRoutes(payload.app.routes);
   renderArchiveState(payload.archive);
-  renderPreview(payload.app);
+  renderPreview(payload.app, payload.archive);
   bindSearch(payload.search);
 }
 
@@ -132,7 +301,8 @@ async function bootstrap() {
 window.addEventListener("hashchange", () => {
   state.currentRoute = window.location.hash || "#/dashboard";
   if (state.payload) {
-    renderPreview(state.payload.app);
+    renderPreview(state.payload.app, state.payload.archive);
+    bindSearch(state.payload.search);
   }
 });
 

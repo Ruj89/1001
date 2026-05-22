@@ -31,6 +31,7 @@ def build_dashboard_payload(storage: LocalArchiveStorage) -> dict[str, object]:
     serialized_storage = serialize_local_archive_storage(storage)
     active_archive = serialized_storage["activeArchive"]
     metadata = None if active_archive is None else active_archive["metadata"]
+    active_titles = [] if active_archive is None else active_archive["titles"]
 
     has_active_archive = metadata is not None and bool(metadata["archivioAttivo"])
     quick_actions = (
@@ -88,6 +89,7 @@ def build_dashboard_payload(storage: LocalArchiveStorage) -> dict[str, object]:
         "archive": {
             "hasActiveArchive": has_active_archive,
             "metadata": metadata,
+            "activeTitles": active_titles,
             "emptyState": {
                 "title": "Nessun archivio attivo",
                 "body": "Importa un file ODS per attivare il dataset locale e sbloccare consultazione, ricerca ed export.",
