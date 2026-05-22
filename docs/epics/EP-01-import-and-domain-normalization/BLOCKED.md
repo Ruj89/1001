@@ -1,7 +1,7 @@
 ## T-02 Normalize fill-down and group titles
 
-- Status: `accepted`
-- Reason: `ST-02.4` is blocked by an unresolved contract mismatch between the real sample workbook and the current domain-model requirements.
-- Evidence: Inspected [src/lista_normalizer.py](/root/bed-project/src/lista_normalizer.py), [tests/test_lista_normalizer.py](/root/bed-project/tests/test_lista_normalizer.py), [src/archive_model.py](/root/bed-project/src/archive_model.py), [tests/test_archive_model.py](/root/bed-project/tests/test_archive_model.py), and the parsed `.local/1001.ods` sample. After title-only fill-down, the sample still contains 244 rows with at least one blank non-title field, while `SottoVarianteRecord` currently requires non-blank `piattaforma`, `edizione_versione`, `supporto`, and `stato`.
-- Missing: A decision on whether blank non-title fields in the sample must remain allowed in the normalized/domain contract, receive additional fill-down semantics, or fail the import as unsupported input.
-- Next candidate: `EP-02 / T-01` is the likely next candidate only after this normalization/domain decision is closed; until then, storage schema would be defined against an unstable normalized-record contract.
+- Status: `resolved`
+- Reason: The previous blocker was a contract mismatch between normalized import output and the domain assumption that every imported sub-variant always had all four non-title fields populated.
+- Resolution: [docs/blocking-analysis.md](/root/bed-project/docs/blocking-analysis.md) now fixes the product decision: blank non-title fields from the real workbook remain valid imported legacy data. The task contracts in [T-02](/root/bed-project/docs/epics/EP-01-import-and-domain-normalization/tasks/T-02-normalize-fill-down-and-group-titles.md) and [T-03](/root/bed-project/docs/epics/EP-01-import-and-domain-normalization/tasks/T-03-define-local-domain-model-and-archive-metadata.md) were updated accordingly.
+- Remaining work: Engineering still needs to align code and tests with the updated domain contract, but the blocker is no longer a missing product decision.
+- Next candidate: `EP-02 / T-01` and `EP-02 / T-03`, which now have enough contract clarity to proceed against the updated blank-value policy.

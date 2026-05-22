@@ -8,7 +8,7 @@ Objective: Definire la normalizzazione minima che trasforma le raw rows ordinate
 
 Questo task consuma solo il boundary gia' fissato da `T-01`: una sequenza ordinata di raw rows di `Lista`, ognuna rappresentata da 5 posizioni colonna MVP preservate. La normalizzazione non ridefinisce parse ODS o shape dominio; applica solo fill-down del titolo e grouping per titolo normalizzato, producendo un boundary intermedio ordinato per la successiva costruzione dei record.
 
-Il grouping MVP e' strettamente per match esatto del titolo dopo fill-down e trim esterno. Non sono ammessi consolidamento fuzzy, riordinamenti o deduplicazioni aggiuntive.
+Il grouping MVP e' strettamente per match esatto del titolo dopo fill-down e trim esterno. Non sono ammessi consolidamento fuzzy, riordinamenti o deduplicazioni aggiuntive. I valori non-title vuoti del workbook reale restano valori legacy importati validi nel boundary normalizzato e non devono essere riempiti o rifiutati da questo task.
 
 ## Canonical Contract
 
@@ -33,16 +33,21 @@ Il grouping MVP e' strettamente per match esatto del titolo dopo fill-down e tri
 - Ogni gruppo produce un solo gruppo normalizzato di titolo.
 - L'ordine dei gruppi segue la prima occorrenza del titolo effettivo nell'input.
 - L'ordine delle righe dentro ciascun gruppo segue rigorosamente l'ordine sorgente delle righe appartenenti al gruppo.
-- La costruzione finale di `TitoloRecord` e `SottoVarianteRecord` resta esplicitamente separata finche' non e' chiusa la decisione sui campi non-title vuoti del campione reale.
 
-### 4. Minimum failure behavior
+### 4. Legacy blank-value compatibility
+
+- Dopo il solo fill-down del titolo, i valori vuoti in `piattaforma`, `edizione/versione`, `supporto` o `stato` restano supportati nel boundary normalizzato.
+- Questo task non deve inferire, riempire o sintetizzare valori non-title mancanti.
+- Le righe con valori non-title vuoti non falliscono la normalizzazione solo per tale motivo.
+- I task downstream devono preservare questi valori legacy importati in storage, UI ed export secondo il contratto dominio aggiornato.
+
+### 5. Minimum failure behavior
 
 - Se una raw row non ha esattamente 5 posizioni colonna, la normalizzazione fallisce.
 - Se una riga ha `titolo` vuoto e non esiste un titolo precedente da propagare, la normalizzazione fallisce.
-- La decisione finale su come trattare righe che, dopo fill-down del titolo, restano con uno tra `piattaforma`, `edizione/versione`, `supporto`, `stato` vuoto resta aperta in `ST-02.4`.
 - In caso di failure, il task non deve produrre un dataset parziale accettato.
 
-### 5. Scope rules
+### 6. Scope rules
 
 - Questo task non normalizza il vocabolario degli stati.
 - Questo task non deduplica righe simili oltre al grouping per titolo esatto.
@@ -53,7 +58,7 @@ Il grouping MVP e' strettamente per match esatto del titolo dopo fill-down e tri
 - `ST-02.1` Freeze the raw-row to normalized-row boundary. Status: `completed`
 - `ST-02.2` Apply title fill-down only on blank title positions. Status: `completed`
 - `ST-02.3` Group normalized rows by exact filled-down title and preserve source order. Status: `completed`
-- `ST-02.4` Fail explicitly on rows that violate the minimum normalization contract. Status: `completed`
+- `ST-02.4` Fail explicitly only on unsupported normalization conditions. Status: `completed`
 
 ## Subtask Details And Dependencies
 
@@ -138,11 +143,12 @@ Evidence:
 - Implemented in [src/lista_normalizer.py](/root/bed-project/src/lista_normalizer.py)
 - Verified by [tests/test_lista_normalizer.py](/root/bed-project/tests/test_lista_normalizer.py)
 
-### ST-02.4 Fail explicitly on rows that violate the minimum normalization contract
+### ST-02.4 Fail explicitly only on unsupported normalization conditions
 
 Definition:
 
-- Reject rows with invalid 5-column shape, missing initial title context, or any other row condition that the final normalization contract declares unsupported.
+- Reject rows with invalid 5-column shape or missing initial title context.
+- Preserve non-title blank values as supported import data instead of treating them as normalization failures.
 - Prevent partial activation of a normalized dataset when normalization fails.
 
 Depends on:
@@ -167,7 +173,8 @@ Evidence:
 
 ## Downstream Task Impact
 
-- `EP-02 / T-01` must persist normalized `TitoloRecord` data, not spreadsheet rows.
+- `EP-01 / T-03` must consume this task assuming non-title blanks can survive import as legacy values.
+- `EP-02 / T-01` must persist normalized title-group output without erasing supported blank values.
 - `EP-02 / T-02` must preserve the no-partial-activation rule when an import normalization error occurs.
-- `EP-03 / T-02` and `EP-03 / T-03` must treat grouped titles as the primary browse/detail unit and rely on preserved sub-variant order.
-- `EP-04 / T-01` and `EP-04 / T-03` must reconstruct `Lista`/`Appoggio` from this normalized ordering and fill-down contract.
+- `EP-03 / T-02` and `EP-03 / T-03` must treat grouped titles as the primary browse/detail unit and preserve blank imported values visibly where relevant.
+- `EP-04 / T-01` and `EP-04 / T-03` must reconstruct `Lista`/`Appoggio` from this normalized ordering and blank-value preservation contract.

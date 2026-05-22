@@ -1,33 +1,33 @@
-# EP-03 Blocked Tasks
+# EP-03 Historical Blockers
 
 ## T-01 Build dashboard and primary navigation
 
-- Status: `proposed`
-- Reason: Il repo non contiene ancora un runtime applicativo browser, una shell UI, un router o file frontend su cui implementare dashboard e navigazione primaria.
-- Evidence: Ispezionati `src/*.py`, `tests/*.py`, [docs/epics/EP-03-mobile-archive-ui-and-editing-flows/README.md](/root/bed-project/docs/epics/EP-03-mobile-archive-ui-and-editing-flows/README.md), [docs/epics/EP-03-mobile-archive-ui-and-editing-flows/tasks/T-01-build-dashboard-and-primary-navigation.md](/root/bed-project/docs/epics/EP-03-mobile-archive-ui-and-editing-flows/tasks/T-01-build-dashboard-and-primary-navigation.md). Nel repo esistono solo moduli Python di import, normalizzazione, viste derivate e storage locale.
-- Missing: Base applicativa frontend eseguibile o decisione esplicita sul contenitore UI da usare per dashboard, lista, dettaglio e form.
-- Next candidate: `EP-04 / T-04` Resolve export fidelity strategy, che e' documentale e sblocca `EP-04 / T-03`.
+- Status: `resolved`
+- Reason: The previous blocker was the absence of an explicit frontend runtime decision and executable UI foundation.
+- Resolution: [docs/blocking-analysis.md](/root/bed-project/docs/blocking-analysis.md) now fixes the direction to a browser-based PWA shell in the same repo. The task contract in [T-01](/root/bed-project/docs/epics/EP-03-mobile-archive-ui-and-editing-flows/tasks/T-01-build-dashboard-and-primary-navigation.md) now defines that shell and the dashboard-first navigation baseline.
+- Remaining work: Implementation is still missing, but the work is no longer blocked by unspecified product direction.
+- Next candidate: `EP-03 / T-01` implementation.
 
 ## T-02 Build archive list, search, and status filters
 
-- Status: `proposed`
-- Reason: Mancano runtime frontend, routing UI e query layer lato interfaccia per esporre lista archivio, ricerca e filtri da viewport mobile.
-- Evidence: Ispezionati `src/*.py`, `tests/*.py`, [docs/epics/EP-03-mobile-archive-ui-and-editing-flows/tasks/T-02-build-archive-list-search-and-status-filters.md](/root/bed-project/docs/epics/EP-03-mobile-archive-ui-and-editing-flows/tasks/T-02-build-archive-list-search-and-status-filters.md). Il repo contiene solo logica Python backend-like, senza componenti browser o rendering.
-- Missing: Base UI implementabile e decisione sul framework/contenitore applicativo per lista, stato query e filtri.
-- Next candidate: `EP-05 / T-01` o `EP-04` verification/export work, che possono avanzare senza runtime UI.
+- Status: `resolved`
+- Reason: The previous blocker was the absence of a concrete UI runtime and a defined query/filter contract.
+- Resolution: The accepted contracts in [T-01](/root/bed-project/docs/epics/EP-03-mobile-archive-ui-and-editing-flows/tasks/T-01-build-dashboard-and-primary-navigation.md) and [T-02](/root/bed-project/docs/epics/EP-03-mobile-archive-ui-and-editing-flows/tasks/T-02-build-archive-list-search-and-status-filters.md) now define the required app shell, title-based browse surface, full-status filtering behavior, and handling of missing imported status values.
+- Remaining work: Implementation is still missing, but the task no longer depends on an unresolved product decision.
+- Next candidate: `EP-03 / T-02` implementation after `EP-03 / T-01`.
 
 ## T-03 Build title detail and edit entry flow
 
-- Status: `proposed`
-- Reason: Il contratto di storage e dominio e' pronto, ma manca il livello applicativo/frontend in cui renderizzare il dettaglio read-first e l'ingresso esplicito in modifica.
-- Evidence: Ispezionati [src/archive_storage.py](/root/bed-project/src/archive_storage.py), [src/archive_model.py](/root/bed-project/src/archive_model.py), [docs/epics/EP-03-mobile-archive-ui-and-editing-flows/tasks/T-03-build-title-detail-and-edit-entry-flow.md](/root/bed-project/docs/epics/EP-03-mobile-archive-ui-and-editing-flows/tasks/T-03-build-title-detail-and-edit-entry-flow.md). Esistono solo mutazioni e contratti dati, non viste UI.
-- Missing: Schermate, stato form e navigazione browser per dettaglio/edit.
-- Next candidate: `EP-05 / T-04` verification work sulla persistenza locale, che usa il boundary storage gia' implementato.
+- Status: `resolved`
+- Reason: The previous blocker was the absence of an executable frontend foundation plus uncertainty about how to render imported incomplete data.
+- Resolution: [docs/blocking-analysis.md](/root/bed-project/docs/blocking-analysis.md) fixes both issues. The accepted contract in [T-03](/root/bed-project/docs/epics/EP-03-mobile-archive-ui-and-editing-flows/tasks/T-03-build-title-detail-and-edit-entry-flow.md) now defines read-first detail behavior, explicit edit entry, and visible rendering of missing imported values.
+- Remaining work: Implementation is still missing, but the task no longer needs further product clarification before execution.
+- Next candidate: `EP-03 / T-03` implementation after `EP-03 / T-01` and `EP-03 / T-02`.
 
 ## T-04 Build create title flow
 
-- Status: `proposed`
-- Reason: La creazione persistita del titolo esiste nel boundary storage, ma manca l'interfaccia phone-sized per raccogliere e validare i campi dal lato utente.
-- Evidence: Ispezionati [src/archive_storage.py](/root/bed-project/src/archive_storage.py), [tests/test_archive_storage.py](/root/bed-project/tests/test_archive_storage.py), [docs/epics/EP-03-mobile-archive-ui-and-editing-flows/tasks/T-04-build-create-title-flow.md](/root/bed-project/docs/epics/EP-03-mobile-archive-ui-and-editing-flows/tasks/T-04-build-create-title-flow.md). Nessun file frontend o runtime browser presente nel repo.
-- Missing: Base UI/browser e form create flow implementabile.
-- Next candidate: `EP-04 / T-03` export ODS o task di verifica backend, che non richiedono UI.
+- Status: `resolved`
+- Reason: The previous blocker was the absence of a frontend base plus ambiguity about whether create should inherit the looser import contract.
+- Resolution: The accepted contract in [T-04](/root/bed-project/docs/epics/EP-03-mobile-archive-ui-and-editing-flows/tasks/T-04-build-create-title-flow.md) now fixes create as a stricter user-authored flow that still requires a complete initial sub-variant, while remaining inside the same PWA shell defined by `T-01`.
+- Remaining work: Implementation is still missing, but no additional blocker remains at the task-contract level.
+- Next candidate: `EP-03 / T-04` implementation after `EP-03 / T-01`, `EP-03 / T-02`, and `EP-03 / T-03`.
