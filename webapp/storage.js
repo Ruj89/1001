@@ -32,14 +32,6 @@ const APP_CONFIG = {
       primaryWhenActive: false,
       primaryWhenEmpty: false,
     },
-    {
-      id: "create",
-      label: "Crea titolo",
-      href: "#/create",
-      description: "Apri il flusso per aggiungere un nuovo titolo con sotto-varianti.",
-      primaryWhenActive: false,
-      primaryWhenEmpty: false,
-    },
   ],
 };
 

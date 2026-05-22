@@ -9,21 +9,13 @@
     <link rel="stylesheet" href="__DEPLOY_BASE_PATH__styles.css" />
   </head>
   <body>
+    <nav class="top-nav-shell" aria-label="Navigazione app">
+      <div id="route-nav" class="top-nav"></div>
+    </nav>
+
     <main class="app-shell">
-      <header class="hero">
-        <p class="eyebrow">Archivio personale offline-first</p>
-        <h1 id="app-title">Archivio 1001</h1>
-        <p id="app-tagline" class="tagline"></p>
-      </header>
-
-      <nav id="route-nav" class="dashboard-card top-nav" aria-label="Navigazione app"></nav>
-
       <div id="dashboard-panels">
-        <section class="dashboard-card search-card" aria-labelledby="search-heading">
-          <div class="section-head">
-            <p class="kicker">Dashboard</p>
-            <h2 id="search-heading">Ricerca primaria</h2>
-          </div>
+        <section class="dashboard-card search-card">
           <form id="search-form" class="search-form">
             <label class="sr-only" for="search-input">Cerca un titolo</label>
             <input
@@ -35,32 +27,18 @@
             />
             <button id="search-submit" type="submit">Vai alla lista</button>
           </form>
-          <p class="supporting-copy">
-            La dashboard resta una base operativa leggera. La consultazione completa vive in una vista lista dedicata.
-          </p>
         </section>
 
-        <section class="dashboard-card" aria-labelledby="actions-heading">
-          <div class="section-head">
-            <p class="kicker">Quick actions</p>
-            <h2 id="actions-heading">Punti di ingresso principali</h2>
-          </div>
+        <section class="dashboard-card">
           <nav id="route-grid" class="route-grid" aria-label="Navigazione primaria"></nav>
         </section>
 
-        <section class="dashboard-card" aria-labelledby="archive-heading">
-          <div class="section-head">
-            <p class="kicker">Stato archivio</p>
-            <h2 id="archive-heading">Dataset locale</h2>
-          </div>
+        <section class="dashboard-card">
           <div id="archive-state"></div>
         </section>
       </div>
 
-      <section id="route-surface" class="dashboard-card route-surface" aria-labelledby="view-heading">
-        <h2 id="view-heading" class="sr-only">Vista corrente</h2>
-        <div id="route-content" class="preview-copy"></div>
-      </section>
+      <div id="route-content" class="dashboard-card route-content preview-copy"></div>
     </main>
 
     <script type="module" src="__DEPLOY_BASE_PATH__app.js"></script>

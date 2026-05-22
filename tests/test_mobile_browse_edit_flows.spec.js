@@ -156,14 +156,12 @@ test("browse verification covers combined filters, status filters, and missing-s
   await page.goto(`${BASE_URL}/#/archive`);
 
   await page.locator("#status-filter").selectOption("__missing__");
-  await page.getByRole("button", { name: "Applica filtri" }).click();
   await expect(page).toHaveURL(/status=__missing__/);
   await expect(page.getByRole("link", { name: /Puzzle Bobble/i })).toBeVisible();
   await expect(page.getByRole("link", { name: /Chrono Trigger/i })).toHaveCount(0);
 
   await page.locator("#status-filter").selectOption("OK");
   await page.locator('input[name="platform"]').fill("SNES");
-  await page.getByRole("button", { name: "Applica filtri" }).click();
   await expect(page).toHaveURL(/platform=SNES/);
   await expect(page.getByRole("link", { name: /Chrono Trigger/i })).toBeVisible();
   await expect(page.getByRole("link", { name: /Puzzle Bobble/i })).toHaveCount(0);
@@ -185,7 +183,7 @@ test("detail verification keeps read-first behavior, explicit edit entry, and vi
   await expect(page.locator('input[name="supporto"]')).toHaveValue("");
 });
 
-test("create and update flows keep detail, list, and validation feedback coherent", async ({ page }) => {
+test("update flows keep detail, list, and validation feedback coherent", async ({ page }) => {
   await seedArchiveStorage(page);
   await page.goto(`${BASE_URL}/#/edit?title=Puzzle%20Bobble&variant=0`);
 
@@ -204,20 +202,6 @@ test("create and update flows keep detail, list, and validation feedback coheren
 
   await page.goto(`${BASE_URL}/#/archive?title=Puzzle%20Bobble%20Deluxe`);
   await expect(page.getByRole("link", { name: /Puzzle Bobble Deluxe/i })).toBeVisible();
-
-  await page.goto(`${BASE_URL}/#/create`);
-  await page.locator('input[name="titolo"]').fill("Terranigma");
-  await page.locator('input[name="piattaforma"]').fill("SNES");
-  await page.locator('input[name="edizioneVersione"]').fill("PAL");
-  await page.locator('input[name="supporto"]').fill("cartuccia");
-  await page.locator('input[name="stato"]').fill("OK");
-  await page.getByRole("button", { name: "Salva titolo" }).click();
-
-  await expect(page).toHaveURL(/#\/detail\?title=Terranigma/);
-  await expect(page.getByRole("heading", { name: "Terranigma" })).toBeVisible();
-
-  await page.goto(`${BASE_URL}/#/archive?title=Terranigma`);
-  await expect(page.getByRole("link", { name: /Terranigma/i })).toBeVisible();
 });
 
 test("browser-only shell caches required assets and persisted archive remains usable offline", async ({

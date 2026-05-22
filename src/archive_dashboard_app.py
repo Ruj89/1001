@@ -104,13 +104,6 @@ def build_dashboard_payload(storage: LocalArchiveStorage) -> dict[str, object]:
             description="Rigenera il workbook operativo dal dataset locale corrente.",
             primary=False,
         ),
-        DashboardRouteEntry(
-            id="create",
-            label="Crea titolo",
-            href="#/create",
-            description="Apri il flusso per aggiungere un nuovo titolo con sotto-varianti.",
-            primary=False,
-        ),
     )
 
     return {

@@ -1,5 +1,4 @@
 import {
-  createTitleRecord,
   importODSFile,
   loadDashboardPayload,
   resolvePendingImport,
@@ -11,6 +10,7 @@ const DEPLOY_BASE_PATH = "__DEPLOY_BASE_PATH__";
 const state = {
   payload: null,
   currentRoute: window.location.hash || "#/dashboard",
+  archiveFilterTimerId: null,
 };
 
 function parseHash(hashValue) {
@@ -73,6 +73,14 @@ function listStatusCounts(titles) {
     }
     return normalizeStatusLabel(left[0]).localeCompare(normalizeStatusLabel(right[0]), "it");
   });
+}
+
+function listUniqueVariantFieldValues(titles, fieldName) {
+  return [...new Set(
+    titles
+      .flatMap((title) => title.sottoVarianti.map((variant) => variant[fieldName] || ""))
+      .filter(Boolean),
+  )].sort((left, right) => left.localeCompare(right, "it"));
 }
 
 function getArchiveFilters(params) {
@@ -161,14 +169,36 @@ function summarizeTitle(title) {
   const uniqueValues = (values) => [...new Set(values.filter(Boolean))];
   const platforms = uniqueValues(title.sottoVarianti.map((variant) => variant.piattaforma));
   const supports = uniqueValues(title.sottoVarianti.map((variant) => variant.supporto));
-  const statuses = uniqueValues(
-    title.sottoVarianti.map((variant) => normalizeStatusLabel(variant.stato)),
-  );
 
   return {
     platforms: platforms.slice(0, 2).join(", ") || "Piattaforma mancante",
     supports: supports.slice(0, 2).join(", ") || "Supporto mancante",
-    statuses,
+  };
+}
+
+function getExportIndicator(title) {
+  const statuses = title.sottoVarianti.map((variant) => (variant.stato || "").trim());
+
+  if (statuses.some((status) => status === "OK")) {
+    return {
+      tone: "ok",
+      label: "Esportazione positiva",
+    };
+  }
+
+  if (
+    statuses.length > 0 &&
+    statuses.every((status) => status === "Uscito fuori" || status === "Non reperibile")
+  ) {
+    return {
+      tone: "warn",
+      label: "Esportazione neutra",
+    };
+  }
+
+  return {
+    tone: "missing",
+    label: "Esportazione mancante",
   };
 }
 
@@ -176,14 +206,13 @@ function renderRouteGrid(routes) {
   const routeGrid = document.querySelector("#route-grid");
   routeGrid.innerHTML = "";
 
-  for (const route of routes) {
+  for (const route of routes.filter((route) => route.id !== "create")) {
     const link = document.createElement("a");
     link.className = route.primary ? "route-link route-link-primary" : "route-link";
     link.href = route.href;
     link.dataset.route = route.id;
     link.innerHTML = `
       <strong>${route.label}</strong>
-      <span>${route.description}</span>
     `;
     routeGrid.appendChild(link);
   }
@@ -199,7 +228,7 @@ function renderTopNav(routes, routeId) {
   dashboardLink.textContent = "Dashboard";
   routeNav.appendChild(dashboardLink);
 
-  for (const route of routes) {
+  for (const route of routes.filter((route) => route.id !== "create")) {
     const link = document.createElement("a");
     link.className = route.id === routeId ? "top-nav-link top-nav-link-active" : "top-nav-link";
     link.href = route.href;
@@ -216,7 +245,6 @@ function renderArchiveState(archive) {
     archiveState.innerHTML = `
       <div class="empty-state">
         <h3>${archive.emptyState.title}</h3>
-        <p>${archive.emptyState.body}</p>
         <a class="ghost-link" href="${archive.emptyState.ctaHref}">${archive.emptyState.ctaLabel}</a>
       </div>
     `;
@@ -248,13 +276,7 @@ function renderArchiveState(archive) {
 
 function renderDashboardHome() {
   const routeContent = document.querySelector("#route-content");
-  routeContent.innerHTML = `
-    <div class="home-hint">
-      <p class="kicker">Vista corrente</p>
-      <h2>Dashboard operativa</h2>
-      <p>La lista archivio apre in una vista dedicata. Qui restano ricerca rapida, azioni e stato del dataset locale.</p>
-    </div>
-  `;
+  routeContent.innerHTML = "";
 }
 
 function renderArchiveRoute(archive, params) {
@@ -263,21 +285,10 @@ function renderArchiveRoute(archive, params) {
   const filters = getArchiveFilters(params);
   const filteredTitles = titlesMatchingFilters(titles, filters);
   const statusCounts = listStatusCounts(titles);
+  const platformOptions = listUniqueVariantFieldValues(titles, "piattaforma");
   const quickStatuses = statusCounts.slice(0, 4);
-  const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
   routeContent.innerHTML = `
-    <div class="route-header">
-      <div>
-        <p class="kicker">Lista archivio</p>
-        <h2>Consultazione titoli</h2>
-        <p>${filteredTitles.length} titoli visibili su ${titles.length}. Filtri attivi: ${activeFilterCount}.</p>
-      </div>
-      <div class="detail-actions">
-        <a class="ghost-link" href="#/create">Nuovo titolo</a>
-        <a class="ghost-link" href="#/dashboard">Torna alla dashboard</a>
-      </div>
-    </div>
     <div class="archive-layout">
       <aside class="filter-panel">
         <form id="archive-filter-form" class="filter-form">
@@ -288,7 +299,13 @@ function renderArchiveRoute(archive, params) {
             </label>
             <label>
               <span>Piattaforma</span>
-              <input name="platform" type="search" autocomplete="off" value="${escapeHtmlAttribute(filters.piattaforma)}" />
+              <input
+                name="platform"
+                type="search"
+                list="platform-options"
+                autocomplete="off"
+                value="${escapeHtmlAttribute(filters.piattaforma)}"
+              />
             </label>
             <label>
               <span>Edizione/versione</span>
@@ -316,6 +333,11 @@ function renderArchiveRoute(archive, params) {
               </select>
             </label>
           </div>
+          <datalist id="platform-options">
+            ${platformOptions
+              .map((platform) => `<option value="${escapeHtmlAttribute(platform)}"></option>`)
+              .join("")}
+          </datalist>
           <div class="status-shortcuts">
             ${quickStatuses
               .map(([status, count]) => {
@@ -330,37 +352,31 @@ function renderArchiveRoute(archive, params) {
               .join("")}
           </div>
           <div class="filter-actions">
-            <button type="submit">Applica filtri</button>
-            <a class="text-link" href="#/archive">Pulisci tutto</a>
+            <button id="clear-filters" type="button">Pulisci tutto</button>
           </div>
         </form>
       </aside>
       <div class="archive-results">
-        <div class="archive-summary">
-          <span>${activeFilterCount ? "Filtri combinati attivi" : "Nessun filtro attivo"}</span>
-          <span>Le condizioni su piattaforma, edizione, supporto e stato si combinano sulla stessa sotto-variante.</span>
-        </div>
         <div class="title-list title-list-compact">
           ${
             filteredTitles.length
               ? filteredTitles
                   .map((title) => {
                     const summary = summarizeTitle(title);
+                    const indicator = getExportIndicator(title);
 
                     return `
                       <a class="title-card title-card-compact" href="#/detail?title=${encodeURIComponent(title.titolo)}">
                         <div class="title-card-main">
-                          <strong>${title.titolo}</strong>
+                          <div class="title-card-title">
+                            <span class="title-indicator title-indicator-${indicator.tone}" aria-label="${indicator.label}" title="${indicator.label}"></span>
+                            <strong>${title.titolo}</strong>
+                          </div>
                           <span class="variant-count">${title.sottoVarianti.length} varianti</span>
                         </div>
                         <div class="title-card-summary">
                           <span>${summary.platforms}</span>
                           <span>${summary.supports}</span>
-                        </div>
-                        <div class="status-pill-row status-pill-row-compact">
-                          ${summary.statuses
-                            .map((statusLabel) => `<span class="status-pill">${statusLabel}</span>`)
-                            .join("")}
                         </div>
                       </a>
                     `;
@@ -369,7 +385,6 @@ function renderArchiveRoute(archive, params) {
               : `
                 <div class="empty-state">
                   <h3>Nessun risultato</h3>
-                  <p>I filtri combinati non hanno trovato titoli compatibili. Riduci o rimuovi i criteri per continuare.</p>
                 </div>
               `
           }
@@ -378,9 +393,11 @@ function renderArchiveRoute(archive, params) {
     </div>
   `;
 
-  document.querySelector("#archive-filter-form").onsubmit = (event) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+  const filterForm = document.querySelector("#archive-filter-form");
+  const platformInput = filterForm.elements.namedItem("platform");
+
+  const syncFilters = () => {
+    const formData = new FormData(filterForm);
     const nextFilters = {
       titolo: String(formData.get("title") || "").trim(),
       piattaforma: String(formData.get("platform") || "").trim(),
@@ -388,7 +405,43 @@ function renderArchiveRoute(archive, params) {
       supporto: String(formData.get("support") || "").trim(),
       stato: String(formData.get("status") || "").trim(),
     };
-    window.location.hash = buildArchiveHash(nextFilters);
+
+    const nextHash = buildArchiveHash(nextFilters);
+    if (window.location.hash !== nextHash) {
+      window.location.hash = nextHash;
+    }
+  };
+
+  filterForm.addEventListener("change", syncFilters);
+  filterForm.addEventListener("input", (event) => {
+    if (!(event.target instanceof HTMLInputElement)) {
+      return;
+    }
+
+    if (event.target.name === "platform") {
+      return;
+    }
+
+    window.clearTimeout(state.archiveFilterTimerId);
+    state.archiveFilterTimerId = window.setTimeout(syncFilters, 180);
+  });
+
+  if (platformInput instanceof HTMLInputElement) {
+    platformInput.addEventListener("blur", syncFilters);
+    platformInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        syncFilters();
+      }
+    });
+  }
+
+  document.querySelector("#clear-filters").onclick = () => {
+    window.clearTimeout(state.archiveFilterTimerId);
+    filterForm.reset();
+    if (window.location.hash !== "#/archive") {
+      window.location.hash = "#/archive";
+    }
   };
 }
 
@@ -401,7 +454,6 @@ function renderDetailRoute(archive, params) {
     routeContent.innerHTML = `
       <div class="empty-state">
         <h3>Titolo non disponibile</h3>
-        <p>Il record richiesto non e' disponibile nel dataset locale corrente. Torna alla lista per continuare su una vista coerente.</p>
         <a class="ghost-link" href="#/archive">Torna alla lista</a>
       </div>
     `;
@@ -411,9 +463,7 @@ function renderDetailRoute(archive, params) {
   routeContent.innerHTML = `
     <div class="detail-header">
       <div>
-        <p class="kicker">Dettaglio titolo</p>
         <h2>${title.titolo}</h2>
-        <p>${title.sottoVarianti.length} sotto-varianti in ordine sorgente preservato.</p>
       </div>
       <div class="detail-actions">
         <a class="ghost-link" href="#/archive">Torna alla lista</a>
@@ -472,7 +522,6 @@ function renderEditEntryRoute(archive, params) {
     routeContent.innerHTML = `
       <div class="empty-state">
         <h3>Ingresso modifica non disponibile</h3>
-        <p>Il contesto di modifica non e' piu' valido. Torna al dettaglio o alla lista per ripartire da uno stato coerente.</p>
         <a class="ghost-link" href="#/archive">Torna alla lista</a>
       </div>
     `;
@@ -483,9 +532,7 @@ function renderEditEntryRoute(archive, params) {
   routeContent.innerHTML = `
     <div class="detail-header">
       <div>
-        <p class="kicker">Modifica persistita</p>
         <h2>${title.titolo}</h2>
-        <p>La modifica parte da un'azione esplicita del dettaglio e salva il titolo con la sotto-variante selezionata nel dataset locale attivo.</p>
       </div>
       <div class="detail-actions">
         <a class="ghost-link" href="#/detail?title=${encodeURIComponent(title.titolo)}">Torna al dettaglio</a>
@@ -563,87 +610,6 @@ function renderEditEntryRoute(archive, params) {
   };
 }
 
-function renderCreateRoute() {
-  const routeContent = document.querySelector("#route-content");
-  routeContent.innerHTML = `
-    <div class="detail-header">
-      <div>
-        <p class="kicker">Create title</p>
-        <h2>Nuovo titolo</h2>
-        <p>Inserisci un titolo e una prima sotto-variante completa. Il salvataggio usa il boundary locale del dataset attivo.</p>
-      </div>
-      <div class="detail-actions">
-        <a class="ghost-link" href="#/dashboard">Torna alla dashboard</a>
-        <a class="ghost-link" href="#/archive">Vai alla lista</a>
-      </div>
-    </div>
-    <form id="create-form" class="create-form">
-      <label>
-        <span>Titolo</span>
-        <input name="titolo" type="text" required />
-      </label>
-      <label>
-        <span>Piattaforma</span>
-        <input name="piattaforma" type="text" required />
-      </label>
-      <label>
-        <span>Edizione/versione</span>
-        <input name="edizioneVersione" type="text" required />
-      </label>
-      <label>
-        <span>Supporto</span>
-        <input name="supporto" type="text" required />
-      </label>
-      <label>
-        <span>Stato</span>
-        <input name="stato" type="text" required />
-      </label>
-      <div class="form-actions">
-        <button type="submit">Salva titolo</button>
-      </div>
-      <p id="create-feedback" class="form-feedback" aria-live="polite"></p>
-    </form>
-  `;
-
-  const form = document.querySelector("#create-form");
-  const feedback = document.querySelector("#create-feedback");
-  form.onsubmit = async (event) => {
-    event.preventDefault();
-    const formData = new FormData(form);
-    const payload = {
-      titolo: String(formData.get("titolo") || "").trim(),
-      sottoVariante: {
-        piattaforma: String(formData.get("piattaforma") || "").trim(),
-        edizioneVersione: String(formData.get("edizioneVersione") || "").trim(),
-        supporto: String(formData.get("supporto") || "").trim(),
-        stato: String(formData.get("stato") || "").trim(),
-      },
-    };
-
-    if (
-      !payload.titolo ||
-      !payload.sottoVariante.piattaforma ||
-      !payload.sottoVariante.edizioneVersione ||
-      !payload.sottoVariante.supporto ||
-      !payload.sottoVariante.stato
-    ) {
-      feedback.textContent = "Compila tutti i campi richiesti prima del salvataggio.";
-      return;
-    }
-
-    feedback.textContent = "Salvataggio in corso...";
-
-    try {
-      const nextPayload = await createTitleRecord(payload);
-      state.payload = nextPayload;
-      feedback.textContent = "";
-      window.location.hash = `#/detail?title=${encodeURIComponent(payload.titolo)}`;
-    } catch (error) {
-      feedback.textContent = error.message;
-    }
-  };
-}
-
 function renderImportRoute(archive) {
   const routeContent = document.querySelector("#route-content");
   const pendingImport = archive.pendingImport;
@@ -652,9 +618,7 @@ function renderImportRoute(archive) {
     routeContent.innerHTML = `
       <div class="detail-header">
         <div>
-          <p class="kicker">Import staged</p>
           <h2>Conferma sostituzione archivio</h2>
-          <p>Il nuovo dataset e' stato letto dal foglio Lista ma non e' ancora attivo. Conferma la sostituzione completa dell'archivio locale corrente oppure annulla.</p>
         </div>
         <div class="detail-actions">
           <a class="ghost-link" href="#/archive">Torna alla lista</a>
@@ -715,9 +679,7 @@ function renderImportRoute(archive) {
   routeContent.innerHTML = `
     <div class="detail-header">
       <div>
-        <p class="kicker">Import ODS</p>
         <h2>Carica archivio dal foglio Lista</h2>
-        <p>Seleziona un file ODS locale. Il primo foglio deve chiamarsi <strong>Lista</strong> e rispettare il contratto MVP a 5 colonne.</p>
       </div>
       <div class="detail-actions">
         <a class="ghost-link" href="#/dashboard">Torna alla dashboard</a>
@@ -780,7 +742,6 @@ function renderFallbackRoute(appConfig, routeId) {
     routeContent.innerHTML = `
       <div class="empty-state">
         <h3>Vista non disponibile</h3>
-        <p>La route richiesta non e' implementata in questa shell.</p>
         <a class="ghost-link" href="#/dashboard">Torna alla dashboard</a>
       </div>
     `;
@@ -790,7 +751,6 @@ function renderFallbackRoute(appConfig, routeId) {
   routeContent.innerHTML = `
     <div class="empty-state">
       <h3>${matchingRoute.label}</h3>
-      <p>${matchingRoute.description}</p>
       <a class="ghost-link" href="#/dashboard">Torna alla dashboard</a>
     </div>
   `;
@@ -798,11 +758,11 @@ function renderFallbackRoute(appConfig, routeId) {
 
 function renderRoute(appConfig, archive) {
   const dashboardPanels = document.querySelector("#dashboard-panels");
-  const routeSurface = document.querySelector("#route-surface");
+  const routeContent = document.querySelector("#route-content");
   const { routeId, params } = parseHash(state.currentRoute);
 
   dashboardPanels.hidden = routeId !== "dashboard";
-  routeSurface.hidden = false;
+  routeContent.hidden = routeId === "dashboard";
   renderTopNav(appConfig.routes, routeId);
 
   if (routeId === "dashboard") {
@@ -825,11 +785,6 @@ function renderRoute(appConfig, archive) {
     return;
   }
 
-  if (routeId === "create") {
-    renderCreateRoute();
-    return;
-  }
-
   if (routeId === "import") {
     renderImportRoute(archive);
     return;
@@ -839,7 +794,6 @@ function renderRoute(appConfig, archive) {
     document.querySelector("#route-content").innerHTML = `
       <div class="empty-state">
         <h3>Lista non disponibile</h3>
-        <p>La superficie di consultazione e' pronta, ma serve prima un archivio attivo locale.</p>
         <a class="ghost-link" href="#/import">Importa ODS</a>
       </div>
     `;
@@ -850,7 +804,6 @@ function renderRoute(appConfig, archive) {
     document.querySelector("#route-content").innerHTML = `
       <div class="empty-state">
         <h3>Dettaglio non disponibile</h3>
-        <p>Serve prima un archivio locale attivo per aprire dettaglio o modifica.</p>
         <a class="ghost-link" href="#/import">Importa ODS</a>
       </div>
     `;
@@ -887,8 +840,7 @@ function bindSearch(searchConfig) {
 
 function render(payload) {
   state.payload = payload;
-  document.querySelector("#app-title").textContent = payload.app.name;
-  document.querySelector("#app-tagline").textContent = payload.app.tagline;
+  document.title = payload.app.name;
   renderRouteGrid(payload.app.routes);
   renderArchiveState(payload.archive);
   renderRoute(payload.app, payload.archive);
@@ -917,7 +869,6 @@ bootstrap().catch(() => {
   document.querySelector("#archive-state").innerHTML = `
     <div class="empty-state">
       <h3>Shell non disponibile</h3>
-      <p>Il dataset locale non e' recuperabile. Ripristina la persistenza browser o riapri l'app su uno stato coerente.</p>
     </div>
   `;
 });
