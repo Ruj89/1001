@@ -1,6 +1,6 @@
 # T-01 Publish the hosted HTTPS PWA release procedure
 
-Status: `accepted`
+Status: `completed`
 
 Objective: Definire la procedura operativa di rilascio per pubblicare la PWA via HTTPS e renderla raggiungibile da Android come artefatto installabile o salvabile dal browser.
 
@@ -60,7 +60,12 @@ Blocks:
 
 Status:
 
-- `accepted`
+- `completed`
+
+Evidence:
+
+- `docs/hosted-pwa-release-procedure.md` definisce un modello operativo provider-neutral compatibile con hosting gestito o self-hosting successivo.
+- `scripts/build_pwa_release.sh` produce un artefatto statico browser-only e uno snapshot riusabile senza imporre un vendor specifico.
 
 ### ST-01.2 Definire i passi di publish, aggiornamento e rollback
 
@@ -78,7 +83,12 @@ Blocks:
 
 Status:
 
-- `accepted`
+- `completed`
+
+Evidence:
+
+- `docs/hosted-pwa-release-procedure.md` copre build, publish, aggiornamento e rollback dell'artefatto statico.
+- `package.json` espone `npm run build:pwa-release` come entrypoint operativo minimo per generare l'artefatto di release.
 
 ### ST-01.3 Definire i prerequisiti di reachability Android
 
@@ -98,7 +108,12 @@ Blocks:
 
 Status:
 
-- `accepted`
+- `completed`
+
+Evidence:
+
+- `docs/hosted-pwa-release-procedure.md` congela reachability HTTPS, URL finale, root path richiesto e asset essenziali necessari a Chrome Android.
+- `webapp/manifest.webmanifest` e `webapp/service-worker.js` sono richiamati dalla procedura come prerequisiti pubblicati del target Android.
 
 ### ST-01.4 Documentare la procedura finale di rilascio
 
@@ -118,7 +133,12 @@ Blocks:
 
 Status:
 
-- `accepted`
+- `completed`
+
+Evidence:
+
+- `docs/hosted-pwa-release-procedure.md` pubblica la procedura finale come riferimento operativo unico per publish, update e rollback.
+- `scripts/build_pwa_release.sh` e `dist/pwa-release/release.json` rendono tracciabile l'artefatto descritto nella procedura.
 
 ## Downstream Task Impact
 

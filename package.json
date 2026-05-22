@@ -2,6 +2,7 @@
   "name": "bed-project",
   "private": true,
   "scripts": {
+    "build:pwa-release": "bash scripts/build_pwa_release.sh",
     "test:mobile": "playwright test tests/test_mobile_browse_edit_flows.spec.js --reporter=line"
   },
   "devDependencies": {
