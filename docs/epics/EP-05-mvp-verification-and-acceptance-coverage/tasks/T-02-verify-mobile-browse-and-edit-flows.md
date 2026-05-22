@@ -1,6 +1,6 @@
 # T-02 Verify mobile browse and edit flows
 
-Status: `accepted`
+Status: `proposed`
 
 Objective: Definire il contratto di verifica Android per dashboard, lista, ricerca, filtri, dettaglio, modifica e creazione, con avvio esplicito solo dopo l'esistenza di un runtime UI eseguibile.
 
@@ -50,10 +50,10 @@ La verifica e' downstream rispetto a `EP-03`. Deve partire solo quando dashboard
 
 ## Subtasks
 
-- `ST-02.1` Verify dashboard-first entry, quick actions, and archive status behavior on Android-sized viewports. Status: `accepted`
-- `ST-02.2` Verify local title search and full-status filtering, including missing-status discoverability. Status: `accepted`
-- `ST-02.3` Verify read-first detail, ordered sub-variants, explicit edit entry, and visible missing imported values. Status: `accepted`
-- `ST-02.4` Verify create and update flows on phone-sized viewports with coherent post-save behavior. Status: `accepted`
+- `ST-02.1` Verify dashboard-first entry, quick actions, and archive status behavior on Android-sized viewports. Status: `proposed`
+- `ST-02.2` Verify local title search and full-status filtering, including missing-status discoverability. Status: `proposed`
+- `ST-02.3` Verify read-first detail, ordered sub-variants, explicit edit entry, and visible missing imported values. Status: `proposed`
+- `ST-02.4` Verify create and update flows on phone-sized viewports with coherent post-save behavior. Status: `proposed`
 
 ## Subtask Details And Dependencies
 
