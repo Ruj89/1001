@@ -1,6 +1,6 @@
 # T-02 Verify Android install, relaunch, and offline behavior from the deployed artifact
 
-Status: `accepted`
+Status: `proposed`
 
 Objective: Verificare il comportamento Android sul deployment reale, distinguendo chiaramente questa copertura dalla verifica eseguita su fixture locale o runtime di sviluppo.
 
@@ -14,6 +14,11 @@ La verifica deve partire solo da un artefatto HTTPS reale e non puo' essere sost
 - server Python di sviluppo;
 - semplice verifica di viewport phone-sized;
 - ipotesi su browser Android multipli.
+
+Stato operativo corrente:
+
+- il contratto del task e' definito;
+- l'esecuzione resta bloccata finche' non esistono un URL HTTPS realmente pubblicato e un ambiente Chrome Android reale per la validazione.
 
 ## Canonical Contract
 
@@ -63,7 +68,7 @@ Blocks:
 
 Status:
 
-- `accepted`
+- `proposed`
 
 ### ST-02.2 Verificare riapertura senza runtime di sviluppo
 
@@ -82,7 +87,7 @@ Blocks:
 
 Status:
 
-- `accepted`
+- `proposed`
 
 ### ST-02.3 Verificare disponibilita' offline di shell, archivio locale e flussi core
 
@@ -102,7 +107,7 @@ Blocks:
 
 Status:
 
-- `accepted`
+- `proposed`
 
 ### ST-02.4 Verificare import/export e segnalare limiti residui
 
@@ -121,7 +126,7 @@ Blocks:
 
 Status:
 
-- `accepted`
+- `proposed`
 
 ## Downstream Task Impact
 
