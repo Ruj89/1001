@@ -16,49 +16,50 @@
         <p id="app-tagline" class="tagline"></p>
       </header>
 
-      <section class="dashboard-card search-card" aria-labelledby="search-heading">
-        <div class="section-head">
-          <p class="kicker">Dashboard</p>
-          <h2 id="search-heading">Ricerca primaria</h2>
-        </div>
-        <form id="search-form" class="search-form">
-          <label class="sr-only" for="search-input">Cerca un titolo</label>
-          <input
-            id="search-input"
-            name="query"
-            type="search"
-            autocomplete="off"
-            placeholder="Cerca un titolo"
-          />
-          <button id="search-submit" type="submit">Vai alla lista</button>
-        </form>
-        <p class="supporting-copy">
-          La dashboard apre la ricerca come azione dominante e lascia import/export come azioni secondarie.
-        </p>
-      </section>
+      <nav id="route-nav" class="dashboard-card top-nav" aria-label="Navigazione app"></nav>
 
-      <section class="dashboard-card" aria-labelledby="actions-heading">
-        <div class="section-head">
-          <p class="kicker">Quick actions</p>
-          <h2 id="actions-heading">Punti di ingresso principali</h2>
-        </div>
-        <nav id="route-grid" class="route-grid" aria-label="Navigazione primaria"></nav>
-      </section>
+      <div id="dashboard-panels">
+        <section class="dashboard-card search-card" aria-labelledby="search-heading">
+          <div class="section-head">
+            <p class="kicker">Dashboard</p>
+            <h2 id="search-heading">Ricerca primaria</h2>
+          </div>
+          <form id="search-form" class="search-form">
+            <label class="sr-only" for="search-input">Cerca un titolo</label>
+            <input
+              id="search-input"
+              name="query"
+              type="search"
+              autocomplete="off"
+              placeholder="Cerca un titolo"
+            />
+            <button id="search-submit" type="submit">Vai alla lista</button>
+          </form>
+          <p class="supporting-copy">
+            La dashboard resta una base operativa leggera. La consultazione completa vive in una vista lista dedicata.
+          </p>
+        </section>
 
-      <section class="dashboard-card" aria-labelledby="archive-heading">
-        <div class="section-head">
-          <p class="kicker">Stato archivio</p>
-          <h2 id="archive-heading">Dataset locale</h2>
-        </div>
-        <div id="archive-state"></div>
-      </section>
+        <section class="dashboard-card" aria-labelledby="actions-heading">
+          <div class="section-head">
+            <p class="kicker">Quick actions</p>
+            <h2 id="actions-heading">Punti di ingresso principali</h2>
+          </div>
+          <nav id="route-grid" class="route-grid" aria-label="Navigazione primaria"></nav>
+        </section>
 
-      <section class="dashboard-card route-preview" aria-labelledby="preview-heading">
-        <div class="section-head">
-          <p class="kicker">Browse surface</p>
-          <h2 id="preview-heading">Lista, filtri e route attiva</h2>
-        </div>
-        <div id="route-preview" class="preview-copy"></div>
+        <section class="dashboard-card" aria-labelledby="archive-heading">
+          <div class="section-head">
+            <p class="kicker">Stato archivio</p>
+            <h2 id="archive-heading">Dataset locale</h2>
+          </div>
+          <div id="archive-state"></div>
+        </section>
+      </div>
+
+      <section id="route-surface" class="dashboard-card route-surface" aria-labelledby="view-heading">
+        <h2 id="view-heading" class="sr-only">Vista corrente</h2>
+        <div id="route-content" class="preview-copy"></div>
       </section>
     </main>
 

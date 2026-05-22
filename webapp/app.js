@@ -75,22 +75,104 @@ function listStatusCounts(titles) {
   });
 }
 
-function titlesMatchingFilters(titles, query, status) {
-  return titles.filter((title) => {
-    const matchesQuery = !query || title.titolo.toLowerCase().includes(query.toLowerCase());
-    const matchesStatus =
-      !status ||
-      title.sottoVarianti.some((variant) => {
-        if (status === "__missing__") {
-          return variant.stato === "";
-        }
-        return variant.stato === status;
-      });
-    return matchesQuery && matchesStatus;
+function getArchiveFilters(params) {
+  return {
+    titolo: (params.get("title") || params.get("query") || "").trim(),
+    piattaforma: (params.get("platform") || "").trim(),
+    edizioneVersione: (params.get("edition") || "").trim(),
+    supporto: (params.get("support") || "").trim(),
+    stato: (params.get("status") || "").trim(),
+  };
+}
+
+function buildArchiveHash(filters) {
+  const nextParams = new URLSearchParams();
+
+  if (filters.titolo) {
+    nextParams.set("title", filters.titolo);
+  }
+  if (filters.piattaforma) {
+    nextParams.set("platform", filters.piattaforma);
+  }
+  if (filters.edizioneVersione) {
+    nextParams.set("edition", filters.edizioneVersione);
+  }
+  if (filters.supporto) {
+    nextParams.set("support", filters.supporto);
+  }
+  if (filters.stato) {
+    nextParams.set("status", filters.stato);
+  }
+
+  const serialized = nextParams.toString();
+  return serialized ? `#/archive?${serialized}` : "#/archive";
+}
+
+function normalizeFilterTerm(value) {
+  return value.trim().toLowerCase();
+}
+
+function variantMatchesField(variantValue, filterValue) {
+  return normalizeFilterTerm(variantValue).includes(normalizeFilterTerm(filterValue));
+}
+
+function titleMatchesFilters(title, filters) {
+  const matchesTitle =
+    !filters.titolo || normalizeFilterTerm(title.titolo).includes(normalizeFilterTerm(filters.titolo));
+
+  if (!matchesTitle) {
+    return false;
+  }
+
+  return title.sottoVarianti.some((variant) => {
+    if (filters.stato) {
+      if (filters.stato === "__missing__" && variant.stato !== "") {
+        return false;
+      }
+      if (filters.stato !== "__missing__" && variant.stato !== filters.stato) {
+        return false;
+      }
+    }
+
+    if (filters.piattaforma && !variantMatchesField(variant.piattaforma, filters.piattaforma)) {
+      return false;
+    }
+
+    if (
+      filters.edizioneVersione &&
+      !variantMatchesField(variant.edizioneVersione, filters.edizioneVersione)
+    ) {
+      return false;
+    }
+
+    if (filters.supporto && !variantMatchesField(variant.supporto, filters.supporto)) {
+      return false;
+    }
+
+    return true;
   });
 }
 
-function renderRoutes(routes) {
+function titlesMatchingFilters(titles, filters) {
+  return titles.filter((title) => titleMatchesFilters(title, filters));
+}
+
+function summarizeTitle(title) {
+  const uniqueValues = (values) => [...new Set(values.filter(Boolean))];
+  const platforms = uniqueValues(title.sottoVarianti.map((variant) => variant.piattaforma));
+  const supports = uniqueValues(title.sottoVarianti.map((variant) => variant.supporto));
+  const statuses = uniqueValues(
+    title.sottoVarianti.map((variant) => normalizeStatusLabel(variant.stato)),
+  );
+
+  return {
+    platforms: platforms.slice(0, 2).join(", ") || "Piattaforma mancante",
+    supports: supports.slice(0, 2).join(", ") || "Supporto mancante",
+    statuses,
+  };
+}
+
+function renderRouteGrid(routes) {
   const routeGrid = document.querySelector("#route-grid");
   routeGrid.innerHTML = "";
 
@@ -104,6 +186,26 @@ function renderRoutes(routes) {
       <span>${route.description}</span>
     `;
     routeGrid.appendChild(link);
+  }
+}
+
+function renderTopNav(routes, routeId) {
+  const routeNav = document.querySelector("#route-nav");
+  routeNav.innerHTML = "";
+
+  const dashboardLink = document.createElement("a");
+  dashboardLink.className = routeId === "dashboard" ? "top-nav-link top-nav-link-active" : "top-nav-link";
+  dashboardLink.href = "#/dashboard";
+  dashboardLink.textContent = "Dashboard";
+  routeNav.appendChild(dashboardLink);
+
+  for (const route of routes) {
+    const link = document.createElement("a");
+    link.className = route.id === routeId ? "top-nav-link top-nav-link-active" : "top-nav-link";
+    link.href = route.href;
+    link.dataset.route = route.id;
+    link.textContent = route.label;
+    routeNav.appendChild(link);
   }
 }
 
@@ -144,111 +246,159 @@ function renderArchiveState(archive) {
   `;
 }
 
+function renderDashboardHome() {
+  const routeContent = document.querySelector("#route-content");
+  routeContent.innerHTML = `
+    <div class="home-hint">
+      <p class="kicker">Vista corrente</p>
+      <h2>Dashboard operativa</h2>
+      <p>La lista archivio apre in una vista dedicata. Qui restano ricerca rapida, azioni e stato del dataset locale.</p>
+    </div>
+  `;
+}
+
 function renderArchiveRoute(archive, params) {
-  const preview = document.querySelector("#route-preview");
+  const routeContent = document.querySelector("#route-content");
   const titles = archive.activeTitles || [];
-  const query = params.get("query") || "";
-  const selectedStatus = params.get("status") || "";
-  const filteredTitles = titlesMatchingFilters(titles, query, selectedStatus);
+  const filters = getArchiveFilters(params);
+  const filteredTitles = titlesMatchingFilters(titles, filters);
   const statusCounts = listStatusCounts(titles);
   const quickStatuses = statusCounts.slice(0, 4);
-  const selectedLabel =
-    selectedStatus === "__missing__" ? "Stato mancante" : normalizeStatusLabel(selectedStatus);
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
-  preview.innerHTML = `
-    <div class="archive-toolbar">
+  routeContent.innerHTML = `
+    <div class="route-header">
       <div>
-        <strong>Vista archivio</strong>
-        <p>${filteredTitles.length} titoli visibili su ${titles.length}.</p>
+        <p class="kicker">Lista archivio</p>
+        <h2>Consultazione titoli</h2>
+        <p>${filteredTitles.length} titoli visibili su ${titles.length}. Filtri attivi: ${activeFilterCount}.</p>
       </div>
-      <div class="toolbar-copy">
-        <span>Ricerca: ${query || "nessuna"}</span>
-        <span>Filtro stato: ${selectedStatus ? selectedLabel : "tutti"}</span>
+      <div class="detail-actions">
+        <a class="ghost-link" href="#/create">Nuovo titolo</a>
+        <a class="ghost-link" href="#/dashboard">Torna alla dashboard</a>
       </div>
     </div>
-    <div class="status-shortcuts">
-      ${quickStatuses
-        .map(
-          ([status, count]) => `
-            <a class="status-chip" href="#/archive?status=${encodeURIComponent(status || "__missing__")}">
-              ${normalizeStatusLabel(status)} · ${count}
-            </a>
-          `,
-        )
-        .join("")}
-    </div>
-    <label class="filter-label" for="status-filter">Tutti gli stati</label>
-    <select id="status-filter" class="status-filter">
-      <option value="">Tutti gli stati</option>
-      ${statusCounts
-        .map(
-          ([status, count]) => `
-            <option value="${status || "__missing__"}" ${
-              (status || "__missing__") === selectedStatus ? "selected" : ""
-            }>
-              ${normalizeStatusLabel(status)} (${count})
-            </option>
-          `,
-        )
-        .join("")}
-    </select>
-    <div class="title-list">
-      ${
-        filteredTitles.length
-          ? filteredTitles
-              .map((title) => {
-                const titleStatuses = [
-                  ...new Set(
-                    title.sottoVarianti.map((variant) => normalizeStatusLabel(variant.stato)),
-                  ),
-                ];
-
+    <div class="archive-layout">
+      <aside class="filter-panel">
+        <form id="archive-filter-form" class="filter-form">
+          <div class="filter-grid">
+            <label>
+              <span>Titolo</span>
+              <input name="title" type="search" autocomplete="off" value="${escapeHtmlAttribute(filters.titolo)}" />
+            </label>
+            <label>
+              <span>Piattaforma</span>
+              <input name="platform" type="search" autocomplete="off" value="${escapeHtmlAttribute(filters.piattaforma)}" />
+            </label>
+            <label>
+              <span>Edizione/versione</span>
+              <input name="edition" type="search" autocomplete="off" value="${escapeHtmlAttribute(filters.edizioneVersione)}" />
+            </label>
+            <label>
+              <span>Supporto</span>
+              <input name="support" type="search" autocomplete="off" value="${escapeHtmlAttribute(filters.supporto)}" />
+            </label>
+            <label>
+              <span>Stato</span>
+              <select id="status-filter" name="status" class="status-filter">
+                <option value="">Tutti gli stati</option>
+                ${statusCounts
+                  .map(
+                    ([status, count]) => `
+                      <option value="${status || "__missing__"}" ${
+                        (status || "__missing__") === filters.stato ? "selected" : ""
+                      }>
+                        ${normalizeStatusLabel(status)} (${count})
+                      </option>
+                    `,
+                  )
+                  .join("")}
+              </select>
+            </label>
+          </div>
+          <div class="status-shortcuts">
+            ${quickStatuses
+              .map(([status, count]) => {
+                const nextFilters = { ...filters, stato: status || "__missing__" };
+                const active = nextFilters.stato === filters.stato;
                 return `
-                  <a class="title-card" href="#/detail?title=${encodeURIComponent(title.titolo)}">
-                    <div>
-                      <strong>${title.titolo}</strong>
-                      <p>${title.sottoVarianti.length} sotto-varianti</p>
-                    </div>
-                    <div class="status-pill-row">
-                      ${titleStatuses
-                        .map((statusLabel) => `<span class="status-pill">${statusLabel}</span>`)
-                        .join("")}
-                    </div>
+                  <a class="status-chip ${active ? "status-chip-active" : ""}" href="${buildArchiveHash(nextFilters)}">
+                    ${normalizeStatusLabel(status)} · ${count}
                   </a>
                 `;
               })
-              .join("")
-          : `
-            <div class="empty-state">
-              <h3>Nessun risultato</h3>
-              <p>La ricerca per titolo e i filtri stato non hanno trovato titoli compatibili. Rimuovi o modifica i criteri per continuare.</p>
-            </div>
-          `
-      }
+              .join("")}
+          </div>
+          <div class="filter-actions">
+            <button type="submit">Applica filtri</button>
+            <a class="text-link" href="#/archive">Pulisci tutto</a>
+          </div>
+        </form>
+      </aside>
+      <div class="archive-results">
+        <div class="archive-summary">
+          <span>${activeFilterCount ? "Filtri combinati attivi" : "Nessun filtro attivo"}</span>
+          <span>Le condizioni su piattaforma, edizione, supporto e stato si combinano sulla stessa sotto-variante.</span>
+        </div>
+        <div class="title-list title-list-compact">
+          ${
+            filteredTitles.length
+              ? filteredTitles
+                  .map((title) => {
+                    const summary = summarizeTitle(title);
+
+                    return `
+                      <a class="title-card title-card-compact" href="#/detail?title=${encodeURIComponent(title.titolo)}">
+                        <div class="title-card-main">
+                          <strong>${title.titolo}</strong>
+                          <span class="variant-count">${title.sottoVarianti.length} varianti</span>
+                        </div>
+                        <div class="title-card-summary">
+                          <span>${summary.platforms}</span>
+                          <span>${summary.supports}</span>
+                        </div>
+                        <div class="status-pill-row status-pill-row-compact">
+                          ${summary.statuses
+                            .map((statusLabel) => `<span class="status-pill">${statusLabel}</span>`)
+                            .join("")}
+                        </div>
+                      </a>
+                    `;
+                  })
+                  .join("")
+              : `
+                <div class="empty-state">
+                  <h3>Nessun risultato</h3>
+                  <p>I filtri combinati non hanno trovato titoli compatibili. Riduci o rimuovi i criteri per continuare.</p>
+                </div>
+              `
+          }
+        </div>
+      </div>
     </div>
   `;
 
-  document.querySelector("#status-filter").addEventListener("change", (event) => {
-    const nextStatus = event.target.value;
-    const nextParams = new URLSearchParams();
-    if (query) {
-      nextParams.set("query", query);
-    }
-    if (nextStatus) {
-      nextParams.set("status", nextStatus);
-    }
-    const nextHash = nextParams.toString() ? `#/archive?${nextParams.toString()}` : "#/archive";
-    window.location.hash = nextHash;
-  });
+  document.querySelector("#archive-filter-form").onsubmit = (event) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const nextFilters = {
+      titolo: String(formData.get("title") || "").trim(),
+      piattaforma: String(formData.get("platform") || "").trim(),
+      edizioneVersione: String(formData.get("edition") || "").trim(),
+      supporto: String(formData.get("support") || "").trim(),
+      stato: String(formData.get("status") || "").trim(),
+    };
+    window.location.hash = buildArchiveHash(nextFilters);
+  };
 }
 
 function renderDetailRoute(archive, params) {
-  const preview = document.querySelector("#route-preview");
+  const routeContent = document.querySelector("#route-content");
   const titleName = params.get("title") || "";
   const title = (archive.activeTitles || []).find((entry) => entry.titolo === titleName);
 
   if (!title) {
-    preview.innerHTML = `
+    routeContent.innerHTML = `
       <div class="empty-state">
         <h3>Titolo non disponibile</h3>
         <p>Il record richiesto non e' disponibile nel dataset locale corrente. Torna alla lista per continuare su una vista coerente.</p>
@@ -258,11 +408,11 @@ function renderDetailRoute(archive, params) {
     return;
   }
 
-  preview.innerHTML = `
+  routeContent.innerHTML = `
     <div class="detail-header">
       <div>
         <p class="kicker">Dettaglio titolo</p>
-        <h3>${title.titolo}</h3>
+        <h2>${title.titolo}</h2>
         <p>${title.sottoVarianti.length} sotto-varianti in ordine sorgente preservato.</p>
       </div>
       <div class="detail-actions">
@@ -308,13 +458,18 @@ function renderDetailRoute(archive, params) {
 }
 
 function renderEditEntryRoute(archive, params) {
-  const preview = document.querySelector("#route-preview");
+  const routeContent = document.querySelector("#route-content");
   const titleName = params.get("title") || "";
   const variantIndex = Number(params.get("variant") || "0");
   const title = (archive.activeTitles || []).find((entry) => entry.titolo === titleName);
 
-  if (!title || Number.isNaN(variantIndex) || variantIndex < 0 || variantIndex >= title.sottoVarianti.length) {
-    preview.innerHTML = `
+  if (
+    !title ||
+    Number.isNaN(variantIndex) ||
+    variantIndex < 0 ||
+    variantIndex >= title.sottoVarianti.length
+  ) {
+    routeContent.innerHTML = `
       <div class="empty-state">
         <h3>Ingresso modifica non disponibile</h3>
         <p>Il contesto di modifica non e' piu' valido. Torna al dettaglio o alla lista per ripartire da uno stato coerente.</p>
@@ -325,11 +480,11 @@ function renderEditEntryRoute(archive, params) {
   }
 
   const selectedVariant = title.sottoVarianti[variantIndex];
-  preview.innerHTML = `
+  routeContent.innerHTML = `
     <div class="detail-header">
       <div>
         <p class="kicker">Modifica persistita</p>
-        <h3>${title.titolo}</h3>
+        <h2>${title.titolo}</h2>
         <p>La modifica parte da un'azione esplicita del dettaglio e salva il titolo con la sotto-variante selezionata nel dataset locale attivo.</p>
       </div>
       <div class="detail-actions">
@@ -409,12 +564,12 @@ function renderEditEntryRoute(archive, params) {
 }
 
 function renderCreateRoute() {
-  const preview = document.querySelector("#route-preview");
-  preview.innerHTML = `
+  const routeContent = document.querySelector("#route-content");
+  routeContent.innerHTML = `
     <div class="detail-header">
       <div>
         <p class="kicker">Create title</p>
-        <h3>Nuovo titolo</h3>
+        <h2>Nuovo titolo</h2>
         <p>Inserisci un titolo e una prima sotto-variante completa. Il salvataggio usa il boundary locale del dataset attivo.</p>
       </div>
       <div class="detail-actions">
@@ -490,15 +645,15 @@ function renderCreateRoute() {
 }
 
 function renderImportRoute(archive) {
-  const preview = document.querySelector("#route-preview");
+  const routeContent = document.querySelector("#route-content");
   const pendingImport = archive.pendingImport;
 
   if (pendingImport) {
-    preview.innerHTML = `
+    routeContent.innerHTML = `
       <div class="detail-header">
         <div>
           <p class="kicker">Import staged</p>
-          <h3>Conferma sostituzione archivio</h3>
+          <h2>Conferma sostituzione archivio</h2>
           <p>Il nuovo dataset e' stato letto dal foglio Lista ma non e' ancora attivo. Conferma la sostituzione completa dell'archivio locale corrente oppure annulla.</p>
         </div>
         <div class="detail-actions">
@@ -557,11 +712,11 @@ function renderImportRoute(archive) {
     return;
   }
 
-  preview.innerHTML = `
+  routeContent.innerHTML = `
     <div class="detail-header">
       <div>
         <p class="kicker">Import ODS</p>
-        <h3>Carica archivio dal foglio Lista</h3>
+        <h2>Carica archivio dal foglio Lista</h2>
         <p>Seleziona un file ODS locale. Il primo foglio deve chiamarsi <strong>Lista</strong> e rispettare il contratto MVP a 5 colonne.</p>
       </div>
       <div class="detail-actions">
@@ -617,10 +772,43 @@ function renderImportRoute(archive) {
   };
 }
 
-function renderPreview(appConfig, archive) {
-  const preview = document.querySelector("#route-preview");
-  const { routeId, params } = parseHash(state.currentRoute);
+function renderFallbackRoute(appConfig, routeId) {
+  const routeContent = document.querySelector("#route-content");
   const matchingRoute = appConfig.routes.find((route) => route.id === routeId);
+
+  if (!matchingRoute) {
+    routeContent.innerHTML = `
+      <div class="empty-state">
+        <h3>Vista non disponibile</h3>
+        <p>La route richiesta non e' implementata in questa shell.</p>
+        <a class="ghost-link" href="#/dashboard">Torna alla dashboard</a>
+      </div>
+    `;
+    return;
+  }
+
+  routeContent.innerHTML = `
+    <div class="empty-state">
+      <h3>${matchingRoute.label}</h3>
+      <p>${matchingRoute.description}</p>
+      <a class="ghost-link" href="#/dashboard">Torna alla dashboard</a>
+    </div>
+  `;
+}
+
+function renderRoute(appConfig, archive) {
+  const dashboardPanels = document.querySelector("#dashboard-panels");
+  const routeSurface = document.querySelector("#route-surface");
+  const { routeId, params } = parseHash(state.currentRoute);
+
+  dashboardPanels.hidden = routeId !== "dashboard";
+  routeSurface.hidden = false;
+  renderTopNav(appConfig.routes, routeId);
+
+  if (routeId === "dashboard") {
+    renderDashboardHome();
+    return;
+  }
 
   if (routeId === "archive" && archive.hasActiveArchive) {
     renderArchiveRoute(archive, params);
@@ -648,10 +836,10 @@ function renderPreview(appConfig, archive) {
   }
 
   if (routeId === "archive" && !archive.hasActiveArchive) {
-    preview.innerHTML = `
+    document.querySelector("#route-content").innerHTML = `
       <div class="empty-state">
         <h3>Lista non disponibile</h3>
-        <p>La superficie di browse e' pronta, ma serve prima un archivio attivo locale.</p>
+        <p>La superficie di consultazione e' pronta, ma serve prima un archivio attivo locale.</p>
         <a class="ghost-link" href="#/import">Importa ODS</a>
       </div>
     `;
@@ -659,7 +847,7 @@ function renderPreview(appConfig, archive) {
   }
 
   if ((routeId === "detail" || routeId === "edit") && !archive.hasActiveArchive) {
-    preview.innerHTML = `
+    document.querySelector("#route-content").innerHTML = `
       <div class="empty-state">
         <h3>Dettaglio non disponibile</h3>
         <p>Serve prima un archivio locale attivo per aprire dettaglio o modifica.</p>
@@ -669,18 +857,7 @@ function renderPreview(appConfig, archive) {
     return;
   }
 
-  if (!matchingRoute) {
-    preview.innerHTML = `
-      <p>Questa shell espone gia' le route future. La vista corrente non e' ancora implementata, ma l'ingresso e' stabilito.</p>
-    `;
-    return;
-  }
-
-  preview.innerHTML = `
-    <p><strong>Route corrente:</strong> ${matchingRoute.label}</p>
-    <p>${matchingRoute.description}</p>
-    <p>La dashboard resta l'hub di ritorno per lista, import, export e creazione.</p>
-  `;
+  renderFallbackRoute(appConfig, routeId);
 }
 
 function bindSearch(searchConfig) {
@@ -688,20 +865,22 @@ function bindSearch(searchConfig) {
   const submit = document.querySelector("#search-submit");
   const searchForm = document.querySelector("#search-form");
   const { routeId, params } = parseHash(state.currentRoute);
+  const filters = getArchiveFilters(params);
+
   input.placeholder = searchConfig.placeholder;
   submit.textContent = searchConfig.submitLabel;
-  input.value = routeId === "archive" ? params.get("query") || "" : "";
+  input.value = routeId === "archive" ? filters.titolo : "";
 
   searchForm.onsubmit = (event) => {
     event.preventDefault();
-    const query = input.value.trim();
-    const nextParams = new URLSearchParams();
-    if (query) {
-      nextParams.set("query", query);
-    }
-    const nextHash = nextParams.toString()
-      ? `${searchConfig.destinationHref}?${nextParams.toString()}`
-      : searchConfig.destinationHref;
+    const title = input.value.trim();
+    const nextHash = buildArchiveHash({
+      titolo: title,
+      piattaforma: "",
+      edizioneVersione: "",
+      supporto: "",
+      stato: "",
+    });
     window.location.hash = nextHash;
   };
 }
@@ -710,9 +889,9 @@ function render(payload) {
   state.payload = payload;
   document.querySelector("#app-title").textContent = payload.app.name;
   document.querySelector("#app-tagline").textContent = payload.app.tagline;
-  renderRoutes(payload.app.routes);
+  renderRouteGrid(payload.app.routes);
   renderArchiveState(payload.archive);
-  renderPreview(payload.app, payload.archive);
+  renderRoute(payload.app, payload.archive);
   bindSearch(payload.search);
 }
 
