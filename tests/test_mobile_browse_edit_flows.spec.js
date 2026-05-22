@@ -203,3 +203,40 @@ test("create and update flows keep detail, list, and validation feedback coheren
   await page.goto(`${BASE_URL}/#/archive?query=Terranigma`);
   await expect(page.getByRole("link", { name: /Terranigma/i })).toBeVisible();
 });
+
+test("browser-only shell caches required assets and persisted archive remains usable offline", async ({
+  page,
+}) => {
+  await seedArchiveStorage(page);
+  await page.goto(`${BASE_URL}/#/archive?query=Chrono%20Trigger`);
+
+  await expect(page.getByRole("link", { name: /Chrono Trigger/i })).toBeVisible();
+
+  await page.evaluate(async () => {
+    const cache = await caches.open("archivio-1001-shell-v1");
+    const requiredAssets = [
+      "/index.html",
+      "/styles.css",
+      "/app.js",
+      "/storage.js",
+      "/manifest.webmanifest",
+      "/icon-192.svg",
+      "/icon-512.svg",
+    ];
+
+    for (const asset of requiredAssets) {
+      const match = await cache.match(asset);
+      if (!match) {
+        throw new Error(`Missing cached asset: ${asset}`);
+      }
+    }
+  });
+
+  await page.context().setOffline(true);
+  await page.goto(`${BASE_URL}/#/detail?title=Chrono%20Trigger`);
+
+  await expect(page.getByRole("heading", { name: "Chrono Trigger" })).toBeVisible();
+  await expect(page.getByText("1 sotto-varianti in ordine sorgente preservato.")).toBeVisible();
+
+  await page.context().setOffline(false);
+});

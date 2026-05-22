@@ -1,6 +1,6 @@
 # T-03 Align static assets, local persistence boot, and installability requirements for hosted release
 
-Status: `accepted`
+Status: `completed`
 
 Objective: Preparare il runtime browser-only a un rilascio HTTPS gestito, con asset statici coerenti, boot locale persistente e requisiti minimi di installabilita' PWA.
 
@@ -67,7 +67,12 @@ Blocks:
 
 Status:
 
-- `accepted`
+- `completed`
+
+Evidence:
+
+- `webapp/manifest.webmanifest` definisce shell PWA standalone con metadati coerenti e icone statiche servibili via root path.
+- `webapp/service-worker.js` congela la cache shell browser-only con asset statici, manifest e icone senza dipendenze residue dal server Python.
 
 ### ST-03.2 Allineare manifest, service worker e shell offline
 
@@ -89,7 +94,13 @@ Blocks:
 
 Status:
 
-- `accepted`
+- `completed`
+
+Evidence:
+
+- `webapp/manifest.webmanifest` allinea `start_url`, display standalone e icone al target installabile HTTPS.
+- `webapp/service-worker.js` precachea shell e fallback su `/index.html` per la riapertura offline dopo il primo caricamento valido.
+- `tests/test_mobile_browse_edit_flows.spec.js` verifica la presenza degli asset richiesti in cache e la fruibilita' offline dell'archivio persistito.
 
 ### ST-03.3 Definire il comportamento di boot persistente locale
 
@@ -110,7 +121,13 @@ Blocks:
 
 Status:
 
-- `accepted`
+- `completed`
+
+Evidence:
+
+- `webapp/storage.js` definisce bootstrap e recovery sul boundary browser-local IndexedDB.
+- `webapp/app.js` legge archivio attivo, stato vuoto e failure di recovery dal runtime locale senza bootstrap HTTP.
+- `tests/test_mobile_browse_edit_flows.spec.js` seeda IndexedDB e verifica il boot coerente del runtime browser-only.
 
 ### ST-03.4 Fissare i prerequisiti minimi di release
 
@@ -131,7 +148,12 @@ Blocks:
 
 Status:
 
-- `accepted`
+- `completed`
+
+Evidence:
+
+- Il runtime browser-only ora ha output statico coerente, shell cacheabile offline e boot persistente locale verificato.
+- La validazione corrente e' fissata sulla suite mobile browser-only come baseline prima della procedura di publish `EP-07 / T-01`.
 
 ## Downstream Task Impact
 

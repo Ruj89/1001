@@ -4,7 +4,10 @@ const SHELL_ASSETS = [
   "/index.html",
   "/styles.css",
   "/app.js",
+  "/storage.js",
   "/manifest.webmanifest",
+  "/icon-192.svg",
+  "/icon-512.svg",
 ];
 
 self.addEventListener("install", (event) => {
