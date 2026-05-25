@@ -167,6 +167,23 @@ test("browse verification covers combined filters, status filters, and missing-s
   await expect(page.getByRole("link", { name: /Puzzle Bobble/i })).toHaveCount(0);
 });
 
+test("clear filters empties the title search instead of restoring the previous value", async ({ page }) => {
+  await seedArchiveStorage(page);
+  await page.goto(`${BASE_URL}/#/archive?title=Chrono%20Trigger&platform=SNES&status=OK`);
+
+  await expect(page.locator('input[name="title"]')).toHaveValue("Chrono Trigger");
+  await expect(page.locator('input[name="platform"]')).toHaveValue("SNES");
+
+  await page.getByRole("button", { name: "Pulisci tutto" }).click();
+
+  await expect(page).toHaveURL(/#\/archive$/);
+  await expect(page.locator('input[name="title"]')).toHaveValue("");
+  await expect(page.locator('input[name="platform"]')).toHaveValue("");
+  await expect(page.locator("#status-filter")).toHaveValue("");
+  await expect(page.getByRole("link", { name: /Puzzle Bobble/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Chrono Trigger/i })).toBeVisible();
+});
+
 test("detail verification keeps read-first behavior, explicit edit entry, and visible missing values", async ({
   page,
 }) => {

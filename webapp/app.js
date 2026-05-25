@@ -535,11 +535,11 @@ function renderArchiveRoute(archive, params) {
   document.querySelector("#clear-filters").onclick = () => {
     window.clearTimeout(state.archiveFilterTimerId);
     filterForm.reset();
+    for (const input of textFilterInputs) {
+      input.value = "";
+    }
     if (statusFilter instanceof HTMLSelectElement) {
       statusFilter.value = "";
-    }
-    if (platformInput instanceof HTMLInputElement) {
-      platformInput.value = "";
     }
     if (platformSuggestions instanceof HTMLDivElement) {
       platformSuggestions.hidden = true;
