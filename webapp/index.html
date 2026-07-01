@@ -3,32 +3,38 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#b04a2f" />
+    <meta name="theme-color" content="#061121" />
     <title>Archivio 1001</title>
-    <link rel="manifest" href="__DEPLOY_BASE_PATH__manifest.webmanifest" />
-    <link rel="stylesheet" href="__DEPLOY_BASE_PATH__styles.css" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <nav class="top-nav-shell" aria-label="Navigazione app">
-      <div id="route-nav" class="top-nav"></div>
-    </nav>
+    <header class="app-header">
+      <div class="brand-row">
+        <a href="#/dashboard" aria-label="Torna alla dashboard">
+          <img src="logo-full.png" alt="" />
+        </a>
+      </div>
+
+      <section class="search-card">
+        <h2 class="sr-only">Ricerca primaria</h2>
+        <form id="search-form" class="search-form">
+          <label class="sr-only" for="search-input">Cerca un titolo</label>
+          <span class="search-icon" aria-hidden="true"></span>
+          <input
+            id="search-input"
+            name="query"
+            type="search"
+            autocomplete="off"
+            placeholder="Cerca giochi, piattaforme, tag..."
+          />
+          <button id="search-submit" type="submit" aria-label="Vai alla lista">Vai</button>
+        </form>
+      </section>
+    </header>
 
     <main class="app-shell">
       <div id="dashboard-panels">
-        <section class="dashboard-card search-card">
-          <form id="search-form" class="search-form">
-            <label class="sr-only" for="search-input">Cerca un titolo</label>
-            <input
-              id="search-input"
-              name="query"
-              type="search"
-              autocomplete="off"
-              placeholder="Cerca un titolo"
-            />
-            <button id="search-submit" type="submit">Vai alla lista</button>
-          </form>
-        </section>
-
         <section class="dashboard-card">
           <nav id="route-grid" class="route-grid" aria-label="Navigazione primaria"></nav>
         </section>
@@ -41,6 +47,10 @@
       <div id="route-content" class="dashboard-card route-content preview-copy"></div>
     </main>
 
-    <script type="module" src="__DEPLOY_BASE_PATH__app.js"></script>
+    <nav class="top-nav-shell" aria-label="Navigazione app">
+      <div id="route-nav" class="top-nav"></div>
+    </nav>
+
+    <script type="module" src="app.js"></script>
   </body>
 </html>

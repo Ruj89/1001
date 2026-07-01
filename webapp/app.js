@@ -5,11 +5,9 @@ import {
   updateTitleRecord,
 } from "./storage.js";
 
-const DEPLOY_BASE_PATH = "__DEPLOY_BASE_PATH__";
-
 const state = {
   payload: null,
-  currentRoute: window.location.hash || "#/dashboard",
+  currentRoute: window.location.hash || "",
   archiveFilterTimerId: null,
 };
 
@@ -21,6 +19,14 @@ function parseHash(hashValue) {
     routeId: routePart || "dashboard",
     params: new URLSearchParams(queryPart),
   };
+}
+
+function resolveInitialRoute(payload) {
+  if (window.location.hash) {
+    return window.location.hash;
+  }
+
+  return payload.archive.hasActiveArchive ? "#/archive" : "#/dashboard";
 }
 
 function formatTimestamp(timestamp) {
@@ -201,20 +207,76 @@ function getExportIndicator(title) {
     };
   }
 
+  if (statuses.some((status) => !status)) {
+    return {
+      tone: "warn",
+      label: "Stato da completare",
+    };
+  }
+
   if (
     statuses.length > 0 &&
     statuses.every((status) => status === "Uscito fuori" || status === "Non reperibile")
   ) {
     return {
-      tone: "warn",
-      label: "Esportazione neutra",
+      tone: "missing",
+      label: statuses[0],
     };
   }
 
   return {
-    tone: "missing",
-    label: "Esportazione mancante",
+    tone: "warn",
+    label: "Da lavorare",
   };
+}
+
+function getTitlePrimaryStatus(title) {
+  const statuses = title.sottoVarianti.map((variant) => (variant.stato || "").trim());
+
+  if (statuses.some((status) => status === "OK")) {
+    return {
+      tone: "ok",
+      label: "OK",
+    };
+  }
+
+  if (statuses.some((status) => !status)) {
+    return {
+      tone: "warn",
+      label: "Supporto mancante",
+    };
+  }
+
+  if (
+    statuses.length > 0 &&
+    statuses.every((status) => status === "Uscito fuori" || status === "Non reperibile")
+  ) {
+    return {
+      tone: "missing",
+      label: statuses[0],
+    };
+  }
+
+  return {
+    tone: "warn",
+    label: statuses[0],
+  };
+}
+
+function getNavIcon(routeId) {
+  if (routeId === "dashboard") {
+    return "dashboard";
+  }
+  if (routeId === "archive") {
+    return "archive";
+  }
+  if (routeId === "import") {
+    return "import";
+  }
+  if (routeId === "export") {
+    return "export";
+  }
+  return "default";
 }
 
 function renderRouteGrid(routes) {
@@ -240,7 +302,7 @@ function renderTopNav(routes, routeId) {
   const dashboardLink = document.createElement("a");
   dashboardLink.className = routeId === "dashboard" ? "top-nav-link top-nav-link-active" : "top-nav-link";
   dashboardLink.href = "#/dashboard";
-  dashboardLink.textContent = "Dashboard";
+  dashboardLink.innerHTML = `<span class="route-icon route-icon-${getNavIcon("dashboard")}" aria-hidden="true"></span><strong>Dashboard</strong>`;
   routeNav.appendChild(dashboardLink);
 
   for (const route of routes.filter((route) => route.id !== "create")) {
@@ -248,7 +310,9 @@ function renderTopNav(routes, routeId) {
     link.className = route.id === routeId ? "top-nav-link top-nav-link-active" : "top-nav-link";
     link.href = route.href;
     link.dataset.route = route.id;
-    link.textContent = route.label;
+    link.innerHTML = `<span class="route-icon route-icon-${getNavIcon(route.id)}" aria-hidden="true"></span><strong>${
+      route.id === "archive" ? "Archivio" : route.label.replace(" ODS", "")
+    }</strong>`;
     routeNav.appendChild(link);
   }
 }
@@ -258,8 +322,12 @@ function renderArchiveState(archive) {
 
   if (!archive.hasActiveArchive) {
     archiveState.innerHTML = `
-      <div class="empty-state">
-        <h3>${archive.emptyState.title}</h3>
+      <div class="empty-state empty-archive-state">
+        <img src="logo-32.png" width="32" height="32" alt="" />
+        <div>
+          <h3>${archive.emptyState.title}</h3>
+          <p>${archive.emptyState.body}</p>
+        </div>
         <a class="ghost-link" href="${archive.emptyState.ctaHref}">${archive.emptyState.ctaLabel}</a>
       </div>
     `;
@@ -304,36 +372,29 @@ function renderArchiveRoute(archive, params) {
 
   routeContent.innerHTML = `
     <div class="archive-layout">
-      <aside class="filter-panel">
+      <section class="archive-heading">
+        <h2 class="sr-only">Consultazione titoli</h2>
         <form id="archive-filter-form" class="filter-form">
-          <div class="filter-grid">
-            <label>
-              <span>Titolo</span>
-              <input name="title" type="search" autocomplete="off" value="${escapeHtmlAttribute(filters.titolo)}" />
-            </label>
-            <label>
-              <span>Piattaforma</span>
+          <div class="quick-filter-row" aria-label="Filtri principali">
+            <label class="quick-filter quick-filter-platform">
+              <span class="filter-icon filter-icon-platform" aria-hidden="true"></span>
               <input
                 id="platform-filter"
                 name="platform"
                 type="search"
                 autocomplete="off"
+                placeholder="Piattaforma"
                 value="${escapeHtmlAttribute(filters.piattaforma)}"
               />
-              <div id="platform-suggestions" class="filter-suggestions"></div>
             </label>
-            <label>
-              <span>Edizione/versione</span>
-              <input name="edition" type="search" autocomplete="off" value="${escapeHtmlAttribute(filters.edizioneVersione)}" />
+            <label class="quick-filter">
+              <span class="filter-icon filter-icon-support" aria-hidden="true"></span>
+              <input name="support" type="search" autocomplete="off" placeholder="Supporto" value="${escapeHtmlAttribute(filters.supporto)}" />
             </label>
-            <label>
-              <span>Supporto</span>
-              <input name="support" type="search" autocomplete="off" value="${escapeHtmlAttribute(filters.supporto)}" />
-            </label>
-            <label>
-              <span>Stato</span>
+            <label class="quick-filter">
+              <span class="filter-icon filter-icon-status" aria-hidden="true"></span>
               <select id="status-filter" name="status" class="status-filter">
-                <option value="">Tutti gli stati</option>
+                <option value="">Stato</option>
                 ${statusCounts
                   .map(
                     ([status, count]) => `
@@ -348,6 +409,13 @@ function renderArchiveRoute(archive, params) {
               </select>
             </label>
           </div>
+          <div class="filter-grid">
+            <label>
+              <span>Titolo</span>
+              <input name="title" type="search" autocomplete="off" value="${escapeHtmlAttribute(filters.titolo)}" />
+            </label>
+          </div>
+          <div id="platform-suggestions" class="filter-suggestions"></div>
           <div id="status-shortcuts" class="status-shortcuts">
             ${quickStatuses
               .map(([status, count]) => {
@@ -361,11 +429,8 @@ function renderArchiveRoute(archive, params) {
               })
               .join("")}
           </div>
-          <div class="filter-actions">
-            <button id="clear-filters" type="button">Pulisci tutto</button>
-          </div>
         </form>
-      </aside>
+      </section>
       <div class="archive-results">
         <div id="title-list" class="title-list title-list-compact"></div>
       </div>
@@ -399,19 +464,20 @@ function renderArchiveRoute(archive, params) {
           .map((title) => {
             const summary = summarizeTitle(title);
             const indicator = getExportIndicator(title);
+            const primaryStatus = getTitlePrimaryStatus(title);
 
             return `
               <a class="title-card title-card-compact" href="#/detail?title=${encodeURIComponent(title.titolo)}">
-                <div class="title-card-main">
-                  <div class="title-card-title">
-                    <span class="title-indicator title-indicator-${indicator.tone}" aria-label="${indicator.label}" title="${indicator.label}"></span>
-                    <strong>${title.titolo}</strong>
-                  </div>
-                  <span class="variant-count">${title.sottoVarianti.length} varianti</span>
+                <span class="title-indicator title-indicator-${indicator.tone}" aria-label="${indicator.label}" title="${indicator.label}"></span>
+                <div class="title-copy">
+                  <strong>${title.titolo}</strong>
                 </div>
-                <div class="title-card-summary">
-                  <span>${summary.platforms}</span>
-                  <span>${summary.supports}</span>
+                <div class="title-meta">
+                  <span class="variant-count">${title.sottoVarianti.length} ${
+                    title.sottoVarianti.length === 1 ? "variante" : "varianti"
+                  }</span>
+                  <span class="support-pill">${summary.platforms}</span>
+                  <span class="collection-pill collection-pill-${primaryStatus.tone}">${primaryStatus.label}</span>
                 </div>
               </a>
             `;
@@ -527,25 +593,11 @@ function renderArchiveRoute(archive, params) {
       }
 
       const nextValue = button.getAttribute("data-status-value") || "";
-      statusFilter.value = nextValue;
+      statusFilter.value = statusFilter.value === nextValue ? "" : nextValue;
       syncFilters();
     });
   }
 
-  document.querySelector("#clear-filters").onclick = () => {
-    window.clearTimeout(state.archiveFilterTimerId);
-    filterForm.reset();
-    if (statusFilter instanceof HTMLSelectElement) {
-      statusFilter.value = "";
-    }
-    if (platformInput instanceof HTMLInputElement) {
-      platformInput.value = "";
-    }
-    if (platformSuggestions instanceof HTMLDivElement) {
-      platformSuggestions.hidden = true;
-    }
-    syncFilters();
-  };
 }
 
 function renderDetailRoute(archive, params) {
@@ -567,6 +619,7 @@ function renderDetailRoute(archive, params) {
     <div class="detail-header">
       <div>
         <h2>${title.titolo}</h2>
+        <p>${title.sottoVarianti.length} sotto-varianti in ordine sorgente preservato.</p>
       </div>
       <div class="detail-actions">
         <a class="ghost-link" href="#/archive">Torna alla lista</a>
@@ -636,6 +689,7 @@ function renderEditEntryRoute(archive, params) {
     <div class="detail-header">
       <div>
         <h2>${title.titolo}</h2>
+        <p>Modifica persistita</p>
       </div>
       <div class="detail-actions">
         <a class="ghost-link" href="#/detail?title=${encodeURIComponent(title.titolo)}">Torna al dettaglio</a>
@@ -780,17 +834,23 @@ function renderImportRoute(archive) {
   }
 
   routeContent.innerHTML = `
-    <div class="detail-header">
-      <div>
+    <div class="detail-header import-header">
+      <div class="import-title-copy">
         <h2>Carica archivio dal foglio Lista</h2>
+        <p>Seleziona il workbook ODS: l'import legge il primo foglio chiamato Lista.</p>
       </div>
       <div class="detail-actions">
         <a class="ghost-link" href="#/dashboard">Torna alla dashboard</a>
       </div>
     </div>
-    <form id="import-form" class="create-form">
-      <label>
-        <span>File ODS</span>
+    <form id="import-form" class="create-form import-form-panel">
+      <label class="import-dropzone" for="import-file">
+        <span class="import-dropzone-icon" aria-hidden="true"></span>
+        <span class="import-dropzone-copy">
+          <strong>File ODS</strong>
+          <small id="import-file-name">Nessun file selezionato</small>
+        </span>
+        <span class="import-dropzone-action">Scegli file</span>
         <input
           id="import-file"
           name="archiveFile"
@@ -799,7 +859,7 @@ function renderImportRoute(archive) {
           required
         />
       </label>
-      <div class="form-actions">
+      <div class="form-actions import-actions">
         <button type="submit">Leggi archivio</button>
       </div>
       <p id="import-feedback" class="form-feedback" aria-live="polite"></p>
@@ -809,6 +869,12 @@ function renderImportRoute(archive) {
   const form = document.querySelector("#import-form");
   const fileInput = document.querySelector("#import-file");
   const feedback = document.querySelector("#import-feedback");
+  const fileName = document.querySelector("#import-file-name");
+
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files && fileInput.files[0];
+    fileName.textContent = file ? file.name : "Nessun file selezionato";
+  });
 
   form.onsubmit = async (event) => {
     event.preventDefault();
@@ -895,8 +961,12 @@ function renderRoute(appConfig, archive) {
 
   if (routeId === "archive" && !archive.hasActiveArchive) {
     document.querySelector("#route-content").innerHTML = `
-      <div class="empty-state">
-        <h3>Lista non disponibile</h3>
+      <div class="empty-state route-empty-state">
+        <img src="logo-32.png" width="32" height="32" alt="" />
+        <div>
+          <h3>Archivio non ancora disponibile</h3>
+          <p>Importa un file ODS per popolare la lista e abilitare ricerca, filtri e dettaglio titoli.</p>
+        </div>
         <a class="ghost-link" href="#/import">Importa ODS</a>
       </div>
     `;
@@ -905,8 +975,12 @@ function renderRoute(appConfig, archive) {
 
   if ((routeId === "detail" || routeId === "edit") && !archive.hasActiveArchive) {
     document.querySelector("#route-content").innerHTML = `
-      <div class="empty-state">
+      <div class="empty-state route-empty-state">
+        <img src="logo-32.png" width="32" height="32" alt="" />
+        <div>
         <h3>Dettaglio non disponibile</h3>
+          <p>Prima importa un archivio per consultare o modificare i titoli.</p>
+        </div>
         <a class="ghost-link" href="#/import">Importa ODS</a>
       </div>
     `;
@@ -924,7 +998,7 @@ function bindSearch(searchConfig) {
   const filters = getArchiveFilters(params);
 
   input.placeholder = searchConfig.placeholder;
-  submit.textContent = searchConfig.submitLabel;
+  submit.textContent = "Vai";
   input.value = routeId === "archive" ? filters.titolo : "";
 
   searchForm.onsubmit = (event) => {
@@ -944,6 +1018,7 @@ function bindSearch(searchConfig) {
 function render(payload) {
   state.payload = payload;
   document.title = payload.app.name;
+  document.body.classList.toggle("has-active-archive", payload.archive.hasActiveArchive);
   renderRouteGrid(payload.app.routes);
   renderArchiveState(payload.archive);
   renderRoute(payload.app, payload.archive);
@@ -952,11 +1027,15 @@ function render(payload) {
 
 async function bootstrap() {
   const payload = await loadDashboardPayload();
+  state.currentRoute = resolveInitialRoute(payload);
+  if (!window.location.hash && state.currentRoute !== "#/dashboard") {
+    history.replaceState(null, "", state.currentRoute);
+  }
   render(payload);
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker
-      .register(`${DEPLOY_BASE_PATH}service-worker.js`, { scope: DEPLOY_BASE_PATH })
+      .register("service-worker.js", { scope: "./" })
       .catch(() => {});
   }
 }

@@ -133,7 +133,7 @@ async function seedArchiveStorage(page, storagePayload = FIXTURE_STORAGE) {
 
 test("dashboard-first entry exposes quick actions, metadata, and primary search", async ({ page }) => {
   await seedArchiveStorage(page);
-  await page.goto(BASE_URL);
+  await page.goto(`${BASE_URL}/#/dashboard`);
 
   await expect(page.getByRole("heading", { name: "Ricerca primaria" })).toBeVisible();
   await expect(page.getByRole("link", { name: /Lista archivio/i })).toBeVisible();
@@ -147,6 +147,26 @@ test("dashboard-first entry exposes quick actions, metadata, and primary search"
   await expect(page.locator("#dashboard-panels")).toBeHidden();
   await expect(page.getByRole("heading", { name: "Consultazione titoli" })).toBeVisible();
   await expect(page.getByRole("link", { name: /Chrono Trigger/i })).toBeVisible();
+});
+
+test("existing active archive opens archive route by default", async ({ page }) => {
+  await seedArchiveStorage(page);
+  await page.goto(BASE_URL);
+
+  await expect(page).toHaveURL(/#\/archive$/);
+  await expect(page.getByLabel("Cerca un titolo")).toBeVisible();
+  await expect(page.locator("#dashboard-panels")).toBeHidden();
+  await expect(page.getByRole("heading", { name: "Consultazione titoli" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Chrono Trigger/i })).toBeVisible();
+});
+
+test("empty archive state hides primary search", async ({ page }) => {
+  await seedArchiveStorage(page, EMPTY_STORAGE);
+  await page.goto(BASE_URL);
+
+  await expect(page.getByLabel("Cerca un titolo")).toBeHidden();
+  await expect(page.getByText("Nessun archivio attivo")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Esporta/i })).toHaveCount(0);
 });
 
 test("browse verification covers combined filters, status filters, and missing-status discoverability", async ({
@@ -165,6 +185,9 @@ test("browse verification covers combined filters, status filters, and missing-s
   await expect(page).toHaveURL(/platform=SNES/);
   await expect(page.getByRole("link", { name: /Chrono Trigger/i })).toBeVisible();
   await expect(page.getByRole("link", { name: /Puzzle Bobble/i })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "OK" }).click();
+  await expect(page.locator("#status-filter")).toHaveValue("");
 });
 
 test("detail verification keeps read-first behavior, explicit edit entry, and visible missing values", async ({

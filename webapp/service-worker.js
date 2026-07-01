@@ -1,15 +1,21 @@
-const DEPLOY_BASE_PATH = "__DEPLOY_BASE_PATH__";
-const CACHE_NAME =
-  DEPLOY_BASE_PATH === "/" ? "archivio-1001-shell-v1" : `archivio-1001-shell-v1-${DEPLOY_BASE_PATH}`;
+const CACHE_NAME = "archivio-1001-shell-v1";
 const SHELL_ASSETS = [
-  DEPLOY_BASE_PATH,
-  `${DEPLOY_BASE_PATH}index.html`,
-  `${DEPLOY_BASE_PATH}styles.css`,
-  `${DEPLOY_BASE_PATH}app.js`,
-  `${DEPLOY_BASE_PATH}storage.js`,
-  `${DEPLOY_BASE_PATH}manifest.webmanifest`,
-  `${DEPLOY_BASE_PATH}icon-192.svg`,
-  `${DEPLOY_BASE_PATH}icon-512.svg`,
+  "./",
+  "index.html",
+  "styles.css",
+  "app.js",
+  "storage.js",
+  "manifest.webmanifest",
+  "logo-32.png",
+  "icon-192.svg",
+  "icon-512.svg",
+  "icons/gamepad-2.svg",
+  "icons/disc-3.svg",
+  "icons/circle-dot.svg",
+  "icons/layout-dashboard.svg",
+  "icons/archive.svg",
+  "icons/upload.svg",
+  "icons/download.svg",
 ];
 
 self.addEventListener("install", (event) => {
@@ -35,7 +41,7 @@ self.addEventListener("fetch", (event) => {
         return cached;
       }
 
-      return fetch(event.request).catch(() => caches.match(`${DEPLOY_BASE_PATH}index.html`));
+      return fetch(event.request).catch(() => caches.match("index.html"));
     }),
   );
 });

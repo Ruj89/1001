@@ -239,13 +239,15 @@ function ensureStoragePayload(payload) {
 }
 
 function buildRoutes(hasActiveArchive) {
-  return APP_CONFIG.routes.map((route) => ({
-    id: route.id,
-    label: route.label,
-    href: route.href,
-    description: route.description,
-    primary: hasActiveArchive ? route.primaryWhenActive : route.primaryWhenEmpty,
-  }));
+  return APP_CONFIG.routes
+    .filter((route) => hasActiveArchive || route.id !== "export")
+    .map((route) => ({
+      id: route.id,
+      label: route.label,
+      href: route.href,
+      description: route.description,
+      primary: hasActiveArchive ? route.primaryWhenActive : route.primaryWhenEmpty,
+    }));
 }
 
 export function buildDashboardPayload(storagePayload) {
@@ -629,6 +631,7 @@ async function parseListaWorkbookFile(file) {
 function normalizeListaRows(listaRows) {
   const groupedRows = new Map();
   let previousTitle = null;
+  let previousPlatform = null;
 
   listaRows.forEach((rawRow, sourceRowIndex) => {
     if (!Array.isArray(rawRow) || rawRow.length !== 5) {
@@ -639,6 +642,7 @@ function normalizeListaRows(listaRows) {
 
     const [titolo, piattaforma, edizioneVersione, supporto, stato] = rawRow;
     const normalizedTitle = titolo.trim();
+    const normalizedPlatform = piattaforma.trim();
 
     let effectiveTitle = normalizedTitle;
     if (normalizedTitle) {
@@ -651,12 +655,19 @@ function normalizeListaRows(listaRows) {
       effectiveTitle = previousTitle;
     }
 
+    let effectivePlatform = normalizedPlatform;
+    if (normalizedPlatform) {
+      previousPlatform = normalizedPlatform;
+    } else {
+      effectivePlatform = previousPlatform || "";
+    }
+
     if (!groupedRows.has(effectiveTitle)) {
       groupedRows.set(effectiveTitle, []);
     }
     groupedRows.get(effectiveTitle).push({
       titolo: effectiveTitle,
-      piattaforma,
+      piattaforma: effectivePlatform,
       edizioneVersione,
       supporto,
       stato,
