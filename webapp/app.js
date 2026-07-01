@@ -597,7 +597,6 @@ function renderArchiveRoute(archive, params) {
       syncFilters();
     });
   }
-
 }
 
 function renderDetailRoute(archive, params) {
