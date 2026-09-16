@@ -442,7 +442,9 @@ dd {
   appearance: none;
 }
 
-.status-filter option {
+.quick-filter option,
+.status-filter option,
+.create-form select option {
   color: #f4f8ff;
   background: #081528;
 }
@@ -472,7 +474,8 @@ dd {
 }
 
 .filter-grid input,
-.create-form input {
+.create-form input,
+.create-form select {
   min-height: 40px;
   border: 1px solid var(--border);
   border-radius: 10px;

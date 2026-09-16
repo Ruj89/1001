@@ -141,7 +141,10 @@ function titleMatchesFilters(title, filters) {
   }
 
   return title.sottoVarianti.some((variant) => {
-    if (filters.piattaforma && !variantMatchesField(variant.piattaforma, filters.piattaforma)) {
+    if (
+      filters.piattaforma &&
+      normalizeFilterTerm(variant.piattaforma) !== normalizeFilterTerm(filters.piattaforma)
+    ) {
       return false;
     }
 
@@ -378,14 +381,22 @@ function renderArchiveRoute(archive, params) {
           <div class="quick-filter-row" aria-label="Filtri principali">
             <label class="quick-filter quick-filter-platform">
               <span class="filter-icon filter-icon-platform" aria-hidden="true"></span>
-              <input
+              <select
                 id="platform-filter"
                 name="platform"
-                type="search"
-                autocomplete="off"
-                placeholder="Piattaforma"
-                value="${escapeHtmlAttribute(filters.piattaforma)}"
-              />
+                aria-label="Piattaforma"
+              >
+                <option value="">Piattaforma</option>
+                ${platformOptions
+                  .map(
+                    (platform) => `
+                      <option value="${escapeHtmlAttribute(platform)}" ${
+                        platform === filters.piattaforma ? "selected" : ""
+                      }>${escapeHtmlAttribute(platform)}</option>
+                    `,
+                  )
+                  .join("")}
+              </select>
             </label>
             <label class="quick-filter">
               <span class="filter-icon filter-icon-support" aria-hidden="true"></span>
@@ -415,7 +426,6 @@ function renderArchiveRoute(archive, params) {
               <input name="title" type="search" autocomplete="off" value="${escapeHtmlAttribute(filters.titolo)}" />
             </label>
           </div>
-          <div id="platform-suggestions" class="filter-suggestions"></div>
           <div id="status-shortcuts" class="status-shortcuts">
             ${quickStatuses
               .map(([status, count]) => {
@@ -438,9 +448,7 @@ function renderArchiveRoute(archive, params) {
   `;
 
   const filterForm = document.querySelector("#archive-filter-form");
-  const platformInput = filterForm.elements.namedItem("platform");
   const statusFilter = filterForm.elements.namedItem("status");
-  const platformSuggestions = document.querySelector("#platform-suggestions");
   const textFilterInputs = [...filterForm.querySelectorAll('input[type="search"]')];
   const titleList = document.querySelector("#title-list");
   const statusShortcuts = document.querySelector("#status-shortcuts");
@@ -527,61 +535,6 @@ function renderArchiveRoute(archive, params) {
         event.preventDefault();
         syncFilters();
       }
-    });
-  }
-
-  if (platformInput instanceof HTMLInputElement) {
-    platformInput.addEventListener("focus", () => {
-      platformInput.select();
-    });
-  }
-
-  if (platformInput instanceof HTMLInputElement && platformSuggestions instanceof HTMLDivElement) {
-    const renderPlatformSuggestions = () => {
-      const query = normalizeFilterTerm(platformInput.value);
-      const visibleOptions = platformOptions
-        .filter((platform) => !query || normalizeFilterTerm(platform).includes(query))
-        .slice(0, 8);
-
-      platformSuggestions.innerHTML = visibleOptions.length
-        ? visibleOptions
-            .map(
-              (platform) => `
-                <button type="button" class="filter-suggestion" data-platform-value="${escapeHtmlAttribute(platform)}">
-                  ${platform}
-                </button>
-              `,
-            )
-            .join("")
-        : "";
-      platformSuggestions.hidden = visibleOptions.length === 0;
-    };
-
-    renderPlatformSuggestions();
-
-    platformInput.addEventListener("focus", renderPlatformSuggestions);
-    platformInput.addEventListener("input", renderPlatformSuggestions);
-    platformInput.addEventListener("blur", () => {
-      window.setTimeout(() => {
-        platformSuggestions.hidden = true;
-        syncFilters();
-      }, 120);
-    });
-    platformInput.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") {
-        platformSuggestions.hidden = true;
-      }
-    });
-
-    platformSuggestions.addEventListener("click", (event) => {
-      const button = event.target instanceof HTMLElement ? event.target.closest("[data-platform-value]") : null;
-      if (!(button instanceof HTMLElement)) {
-        return;
-      }
-
-      platformInput.value = button.dataset.platformValue || "";
-      platformSuggestions.hidden = true;
-      syncFilters();
     });
   }
 
@@ -684,6 +637,7 @@ function renderEditEntryRoute(archive, params) {
   }
 
   const selectedVariant = title.sottoVarianti[variantIndex];
+  const platformOptions = listUniqueVariantFieldValues(archive.activeTitles || [], "piattaforma");
   routeContent.innerHTML = `
     <div class="detail-header">
       <div>
@@ -705,7 +659,20 @@ function renderEditEntryRoute(archive, params) {
         </div>
         <label>
           <span>Piattaforma</span>
-          <input name="piattaforma" type="text" required value="${escapeHtmlAttribute(selectedVariant.piattaforma)}" />
+          <select name="piattaforma" required>
+            <option value="" ${selectedVariant.piattaforma ? "" : "selected"} disabled>
+              Seleziona piattaforma
+            </option>
+            ${platformOptions
+              .map(
+                (platform) => `
+                  <option value="${escapeHtmlAttribute(platform)}" ${
+                    platform === selectedVariant.piattaforma ? "selected" : ""
+                  }>${escapeHtmlAttribute(platform)}</option>
+                `,
+              )
+              .join("")}
+          </select>
         </label>
         <label>
           <span>Edizione/versione</span>

@@ -175,13 +175,21 @@ test("browse verification covers combined filters, status filters, and missing-s
   await seedArchiveStorage(page);
   await page.goto(`${BASE_URL}/#/archive`);
 
+  await expect(page.locator('select[name="platform"]')).toHaveCount(1);
+  await expect(page.locator('input[name="platform"]')).toHaveCount(0);
+  await expect(page.locator('select[name="platform"] option')).toHaveText([
+    "Piattaforma",
+    "Neo Geo",
+    "SNES",
+  ]);
+
   await page.locator("#status-filter").selectOption("__missing__");
   await expect(page).toHaveURL(/status=__missing__/);
   await expect(page.getByRole("link", { name: /Puzzle Bobble/i })).toBeVisible();
   await expect(page.getByRole("link", { name: /Chrono Trigger/i })).toHaveCount(0);
 
   await page.locator("#status-filter").selectOption("OK");
-  await page.locator('input[name="platform"]').fill("SNES");
+  await page.locator('select[name="platform"]').selectOption("SNES");
   await expect(page).toHaveURL(/platform=SNES/);
   await expect(page.getByRole("link", { name: /Chrono Trigger/i })).toBeVisible();
   await expect(page.getByRole("link", { name: /Puzzle Bobble/i })).toHaveCount(0);
@@ -195,13 +203,13 @@ test("clear filters empties the title search instead of restoring the previous v
   await page.goto(`${BASE_URL}/#/archive?title=Chrono%20Trigger&platform=SNES&status=OK`);
 
   await expect(page.locator('input[name="title"]')).toHaveValue("Chrono Trigger");
-  await expect(page.locator('input[name="platform"]')).toHaveValue("SNES");
+  await expect(page.locator('select[name="platform"]')).toHaveValue("SNES");
 
   await page.getByRole("button", { name: "Pulisci tutto" }).click();
 
   await expect(page).toHaveURL(/#\/archive$/);
   await expect(page.locator('input[name="title"]')).toHaveValue("");
-  await expect(page.locator('input[name="platform"]')).toHaveValue("");
+  await expect(page.locator('select[name="platform"]')).toHaveValue("");
   await expect(page.locator("#status-filter")).toHaveValue("");
   await expect(page.getByRole("link", { name: /Puzzle Bobble/i })).toBeVisible();
   await expect(page.getByRole("link", { name: /Chrono Trigger/i })).toBeVisible();
@@ -220,6 +228,8 @@ test("detail verification keeps read-first behavior, explicit edit entry, and vi
   await page.getByRole("link", { name: "Modifica questa variante" }).click();
   await expect(page.getByText("Modifica persistita")).toBeVisible();
   await expect(page.locator('input[name="titolo"]')).toHaveValue("Puzzle Bobble");
+  await expect(page.locator('select[name="piattaforma"]')).toHaveValue("Neo Geo");
+  await expect(page.locator('input[name="piattaforma"]')).toHaveCount(0);
   await expect(page.locator('input[name="supporto"]')).toHaveValue("");
 });
 
