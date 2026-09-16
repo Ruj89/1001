@@ -399,6 +399,17 @@ function renderArchiveRoute(archive, params) {
               </select>
             </label>
             <label class="quick-filter">
+              <span class="filter-icon filter-icon-edition" aria-hidden="true"></span>
+              <input
+                name="edition"
+                type="search"
+                autocomplete="off"
+                aria-label="Edition/version"
+                placeholder="Edition/version"
+                value="${escapeHtmlAttribute(filters.edizioneVersione)}"
+              />
+            </label>
+            <label class="quick-filter">
               <span class="filter-icon filter-icon-support" aria-hidden="true"></span>
               <input name="support" type="search" autocomplete="off" placeholder="Supporto" value="${escapeHtmlAttribute(filters.supporto)}" />
             </label>

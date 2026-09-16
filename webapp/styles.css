@@ -367,7 +367,7 @@ dd {
 
 .quick-filter-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(142px, 1fr));
+  grid-template-columns: repeat(4, minmax(142px, 1fr));
   gap: 12px;
   overflow-x: auto;
   padding: 0 0 2px;
@@ -423,6 +423,11 @@ dd {
 .filter-icon-support {
   mask-image: url("icons/disc-3.svg");
   -webkit-mask-image: url("icons/disc-3.svg");
+}
+
+.filter-icon-edition {
+  mask-image: url("icons/archive.svg");
+  -webkit-mask-image: url("icons/archive.svg");
 }
 
 .filter-icon-status {
@@ -941,7 +946,7 @@ h3 {
   }
 
   .quick-filter-row {
-    grid-template-columns: repeat(3, minmax(132px, 1fr));
+    grid-template-columns: repeat(4, minmax(132px, 1fr));
     gap: 9px;
   }
 
@@ -1034,7 +1039,7 @@ h3 {
 
 @media (max-width: 390px) {
   .quick-filter-row {
-    grid-template-columns: repeat(3, minmax(126px, 1fr));
+    grid-template-columns: repeat(4, minmax(126px, 1fr));
   }
 
   .title-card {

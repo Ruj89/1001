@@ -183,6 +183,13 @@ test("browse verification covers combined filters, status filters, and missing-s
     "SNES",
   ]);
 
+  const editionFilter = page.getByRole("searchbox", { name: "Edition/version" });
+  await editionFilter.fill("PAL");
+  await expect(page).toHaveURL(/edition=PAL/);
+  await expect(page.getByRole("link", { name: /Chrono Trigger/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Puzzle Bobble/i })).toHaveCount(0);
+  await editionFilter.fill("");
+
   await page.locator("#status-filter").selectOption("__missing__");
   await expect(page).toHaveURL(/status=__missing__/);
   await expect(page.getByRole("link", { name: /Puzzle Bobble/i })).toBeVisible();
