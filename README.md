@@ -15,12 +15,13 @@ Flussi oggi presenti:
 - dettaglio titolo con sotto-varianti
 - modifica di una sotto-variante esistente
 - creazione di un nuovo titolo
+- import ODS dal foglio `Lista`, con conferma prima di sostituire l'archivio attivo
+- export ODS dell'archivio locale, anche offline
 - shell offline dopo primo caricamento valido
 
-Flussi gia' previsti ma non ancora implementati end-to-end:
+Da **Esporta → Scarica ODS** si ottiene `archivio-1001.ods` con i fogli `Lista`, `Risultati` e `Appoggio`, in quest'ordine. L'export riprende i colori di stato e le unioni verticali del modello `1001.ods`. Rigenera le formule di `Appoggio`, delle classificazioni e dei conteggi di `Risultati` usando le dimensioni dell'archivio esportato. Gli archivi importati con una versione precedente non contengono le eccezioni originali di colore, unione e posizione delle righe. Per recuperarle bisogna reimportare il file di riferimento: la sostituzione richiede conferma e sovrascrive eventuali modifiche locali.
 
-- import ODS
-- export ODS
+Ogni download crea un ODS nuovo dall'archivio locale: non restituisce il file caricato. L'import salva il colore di sfondo dello stato di ogni variante quando presente. L'app lo mostra accanto allo stato nella lista e nel dettaglio; se lo stato viene modificato, usa il colore predefinito del nuovo stato.
 
 ## Contenuto di `webapp/`
 
@@ -46,7 +47,7 @@ Controller principale della UI.
 Note operative:
 
 - la route di default e' `#/dashboard`
-- le route `#/import` e `#/export` sono ingressi gia' dichiarati, ma la vista completa non e' ancora implementata
+- la route `#/export` permette il download solo se l'archivio locale contiene dati
 - in caso di recovery failure dello storage locale mostra uno stato di errore coerente
 
 ### [`webapp/storage.js`](/root/bed-project/webapp/storage.js)
@@ -77,7 +78,7 @@ Quando `activeArchive` esiste, contiene:
 
 Gestisce il caching della shell PWA.
 
-- cache name corrente: `archivio-1001-shell-v1`
+- cache name corrente: `archivio-1001-shell-v4`
 - precache di HTML, CSS, JS, manifest e icone
 - fallback a `/index.html` quando la rete non e' disponibile
 - nessuna dipendenza da endpoint `/api/*`
@@ -113,7 +114,7 @@ Icone PWA usate dal manifest e cached dal service worker.
 ### Runtime
 
 - frontend statico servito via HTTP/HTTPS
-- nessun backend richiesto per browse, detail, create e update
+- nessun backend richiesto per consultazione, modifica, import ed export
 - persistenza locale nel browser tramite IndexedDB
 - app shell cached via service worker
 
@@ -127,6 +128,8 @@ Routing client-side basato su hash:
 - `#/detail?title=...`
 - `#/edit?title=...&variant=...`
 - `#/create`
+- `#/import`
+- `#/export`
 
 ### Persistenza
 
@@ -177,6 +180,7 @@ La suite verifica:
 - create e update persistiti
 - presenza della shell in cache
 - riuso offline dei dati locali
+- download ODS offline, contenuto dei tre fogli e reimportazione del file generato
 
 ## Deployment
 
@@ -230,7 +234,7 @@ In DevTools:
 1. `Application > Service Workers`
 2. verificare registrazione di `/service-worker.js`
 3. aprire `Cache Storage`
-4. controllare `archivio-1001-shell-v1`
+4. controllare `archivio-1001-shell-v4`
 
 Se la shell offline non funziona:
 
@@ -244,13 +248,12 @@ Se una vista non appare:
 
 - controllare l'hash URL
 - verificare la presenza di `activeArchive` nello storage
-- ricordare che `import` ed `export` non hanno ancora il flusso finale implementato
 
 ## Limiti noti
 
 - supporto ufficiale a `file://`: assente
 - deploy sotto sottocartella: non supportato
-- import/export completi: non ancora implementati nella shell finale
+- export ODS: riproduce la struttura operativa del modello `1001.ods`, non gli stili o le formule arbitrarie di altri file ODS
 - validazione Android reale post-deploy: task ancora aperto a livello backlog
 
 ## License

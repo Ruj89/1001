@@ -1,3 +1,5 @@
+import { buildOperationalODS, normalizeStatusColor, ODS_MIME_TYPE } from "./ods-export.js";
+
 const DB_NAME = "archivio-1001";
 const STORE_NAME = "runtime";
 const STORAGE_KEY = "archive-storage";
@@ -35,11 +37,12 @@ const APP_CONFIG = {
   ],
 };
 
-const ODS_MIME_TYPE = "application/vnd.oasis.opendocument.spreadsheet";
 const XML_NAMESPACES = {
   office: "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
   table: "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
   text: "urn:oasis:names:tc:opendocument:xmlns:text:1.0",
+  style: "urn:oasis:names:tc:opendocument:xmlns:style:1.0",
+  fo: "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0",
 };
 
 function requestToPromise(request) {
@@ -113,11 +116,15 @@ function ensureVariant(variant, context) {
     throw new Error(`${context} must be an object.`);
   }
 
+  const statusColor = normalizeStatusColor(variant.statusColor);
   return {
     piattaforma: ensureString(variant.piattaforma, `${context}.piattaforma`).trim(),
     edizioneVersione: ensureString(variant.edizioneVersione, `${context}.edizioneVersione`).trim(),
     supporto: ensureString(variant.supporto, `${context}.supporto`).trim(),
     stato: ensureString(variant.stato, `${context}.stato`).trim(),
+    ...(Number.isSafeInteger(variant.sourceRow) && variant.sourceRow >= 0 && { sourceRow: variant.sourceRow }),
+    ...(variant.separatePlatform === true && { separatePlatform: true }),
+    ...(statusColor && { statusColor }),
   };
 }
 
@@ -297,6 +304,14 @@ export async function loadDashboardPayload() {
   return buildDashboardPayload(payload);
 }
 
+export async function exportActiveArchiveODS() {
+  const { activeArchive } = ensureStoragePayload(await readStoredPayload());
+  if (!activeArchive?.metadata.archivioAttivo) {
+    throw new Error("Nessun archivio attivo da esportare.");
+  }
+  return buildOperationalODS(activeArchive.titles);
+}
+
 function buildNextMetadata(titleCount) {
   return {
     archivioAttivo: true,
@@ -394,7 +409,16 @@ export async function updateTitleRecord(existingTitle, variantIndex, payload) {
   }
 
   const updatedVariants = [...currentTitle.sottoVarianti];
-  updatedVariants[variantIndex] = nextTitle.sottoVarianti[0];
+  const previousVariant = updatedVariants[variantIndex];
+  const nextVariant = nextTitle.sottoVarianti[0];
+  if (previousVariant.sourceRow !== undefined) nextVariant.sourceRow = previousVariant.sourceRow;
+  if (nextVariant.stato === previousVariant.stato && previousVariant.statusColor) {
+    nextVariant.statusColor = previousVariant.statusColor;
+  }
+  if (nextVariant.piattaforma === previousVariant.piattaforma && previousVariant.separatePlatform) {
+    nextVariant.separatePlatform = true;
+  }
+  updatedVariants[variantIndex] = nextVariant;
   titles[targetIndex] = {
     titolo: nextTitle.titolo,
     sottoVarianti: updatedVariants,
@@ -467,13 +491,14 @@ async function inflateRaw(bytes) {
   return new Uint8Array(inflatedBuffer);
 }
 
-async function readZipEntryText(file, entryName) {
+async function readZipEntryText(file, entryName, required = true) {
   const arrayBuffer = await file.arrayBuffer();
   const bytes = new Uint8Array(arrayBuffer);
   const view = new DataView(arrayBuffer);
   const entry = parseZipEntries(arrayBuffer).find((candidate) => candidate.fileName === entryName);
 
   if (!entry) {
+    if (!required) return null;
     throw new Error(`ODS archive is missing ${entryName}.`);
   }
 
@@ -516,9 +541,23 @@ function parseRepeatCount(rawValue, context) {
   return parsedValue;
 }
 
+function readParagraphText(node) {
+  if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE) {
+    return node.textContent;
+  }
+  if (node.namespaceURI === XML_NAMESPACES.text) {
+    if (node.localName === "s") {
+      return " ".repeat(parseRepeatCount(node.getAttributeNS(XML_NAMESPACES.text, "c"), "text:c"));
+    }
+    if (node.localName === "tab") return "\t";
+    if (node.localName === "line-break") return "\n";
+  }
+  return [...node.childNodes].map(readParagraphText).join("");
+}
+
 function extractCellText(cell) {
   const paragraphs = [...cell.getElementsByTagNameNS(XML_NAMESPACES.text, "p")]
-    .map((paragraph) => paragraph.textContent.trim())
+    .map((paragraph) => readParagraphText(paragraph).trim())
     .filter((value) => value !== "");
 
   if (paragraphs.length) {
@@ -528,9 +567,12 @@ function extractCellText(cell) {
   return (cell.getAttributeNS(XML_NAMESPACES.office, "value") || "").trim();
 }
 
-function parseRowCells(row, rowIndex) {
+function parseRowCells(row, rowIndex, statusColors) {
   const values = [];
   let cellIndex = 0;
+  let explicitStringWidth = 0;
+  let platformIsCovered = false;
+  let statusColor;
 
   for (const cell of row.children) {
     if (
@@ -546,12 +588,27 @@ function parseRowCells(row, rowIndex) {
       `cell ${cellIndex} number-columns-repeated`,
     );
     const cellText = extractCellText(cell);
+    if (values.length < 2 && values.length + repeatedCells >= 2) {
+      platformIsCovered = cell.localName === "covered-table-cell";
+    }
+    if (values.length < 5 && values.length + repeatedCells >= 5) {
+      statusColor = statusColors.get(cell.getAttributeNS(XML_NAMESPACES.table, "style-name"));
+    }
     for (let repeatIndex = 0; repeatIndex < repeatedCells; repeatIndex += 1) {
       values.push(cellText);
     }
+    if (
+      values.length <= 5 &&
+      cell.getAttributeNS(XML_NAMESPACES.office, "value-type") === "string" &&
+      firstElementByTagNameNS(cell, XML_NAMESPACES.text, "p")
+    ) {
+      explicitStringWidth = values.length;
+    }
   }
 
-  while (values.length && values[values.length - 1] === "") {
+  // Keep explicitly serialized blank fields in the five Lista columns, but
+  // ignore trailing spreadsheet padding.
+  while (values.length > explicitStringWidth && values[values.length - 1] === "") {
     values.pop();
   }
 
@@ -559,10 +616,10 @@ function parseRowCells(row, rowIndex) {
     return null;
   }
 
-  return values;
+  return { values, platformIsCovered, statusColor };
 }
 
-function extractNonEmptyRows(sheet) {
+function extractNonEmptyRows(sheet, statusColors) {
   const rows = [];
   const tableRows = [...sheet.children].filter(
     (node) => node.namespaceURI === XML_NAMESPACES.table && node.localName === "table-row",
@@ -573,16 +630,47 @@ function extractNonEmptyRows(sheet) {
       row.getAttributeNS(XML_NAMESPACES.table, "number-rows-repeated"),
       `row ${index + 1} number-rows-repeated`,
     );
-    const parsedRow = parseRowCells(row, index + 1);
+    const parsedRow = parseRowCells(row, index + 1, statusColors);
     if (!parsedRow) {
       return;
     }
     for (let repeatIndex = 0; repeatIndex < repeatedRows; repeatIndex += 1) {
-      rows.push([...parsedRow]);
+      rows.push(parsedRow);
     }
   });
 
   return rows;
+}
+
+function readCellStyleColors(...documents) {
+  const styles = new Map();
+  for (const document of documents) {
+    if (!document) continue;
+    for (const style of document.getElementsByTagNameNS(XML_NAMESPACES.style, "style")) {
+      if (style.getAttributeNS(XML_NAMESPACES.style, "family") !== "table-cell") continue;
+      const properties = firstElementByTagNameNS(style, XML_NAMESPACES.style, "table-cell-properties");
+      styles.set(style.getAttributeNS(XML_NAMESPACES.style, "name"), {
+        background: properties?.getAttributeNS(XML_NAMESPACES.fo, "background-color"),
+        parent: style.getAttributeNS(XML_NAMESPACES.style, "parent-style-name"),
+      });
+    }
+  }
+  const colors = new Map();
+  for (const name of styles.keys()) {
+    const visited = new Set();
+    for (let current = name; current && !visited.has(current);) {
+      visited.add(current);
+      const style = styles.get(current);
+      if (!style) break;
+      if (style.background) {
+        const color = normalizeStatusColor(style.background);
+        if (color) colors.set(name, color);
+        break;
+      }
+      current = style.parent;
+    }
+  }
+  return colors;
 }
 
 async function parseListaWorkbookFile(file) {
@@ -621,7 +709,10 @@ async function parseListaWorkbookFile(file) {
     throw new Error(`First sheet must be named 'Lista'; found ${JSON.stringify(firstSheetName)}`);
   }
 
-  const listaRows = extractNonEmptyRows(firstSheet);
+  const stylesXml = await readZipEntryText(file, "styles.xml", false);
+  const namedStyles = stylesXml ? new DOMParser().parseFromString(stylesXml, "application/xml") : null;
+  const statusColors = readCellStyleColors(namedStyles, xml);
+  const listaRows = extractNonEmptyRows(firstSheet, statusColors);
   return {
     sourceName: fileName,
     listaRows,
@@ -633,7 +724,7 @@ function normalizeListaRows(listaRows) {
   let previousTitle = null;
   let previousPlatform = null;
 
-  listaRows.forEach((rawRow, sourceRowIndex) => {
+  listaRows.forEach(({ values: rawRow, platformIsCovered, statusColor }, sourceRowIndex) => {
     if (!Array.isArray(rawRow) || rawRow.length !== 5) {
       throw new Error(
         `Row ${sourceRowIndex + 1} must contain exactly 5 columns; found ${rawRow.length}`,
@@ -665,24 +756,30 @@ function normalizeListaRows(listaRows) {
     if (!groupedRows.has(effectiveTitle)) {
       groupedRows.set(effectiveTitle, []);
     }
-    groupedRows.get(effectiveTitle).push({
-      titolo: effectiveTitle,
+    const variants = groupedRows.get(effectiveTitle);
+    const previousVariant = variants.at(-1);
+    variants.push({
       piattaforma: effectivePlatform,
-      edizioneVersione,
-      supporto,
-      stato,
+      edizioneVersione: edizioneVersione.trim(),
+      supporto: supporto.trim(),
+      stato: stato.trim(),
+      sourceRow: sourceRowIndex,
+      ...(normalizedPlatform && !platformIsCovered && previousVariant?.piattaforma === effectivePlatform &&
+        { separatePlatform: true }),
+      ...(statusColor && { statusColor }),
     });
   });
 
-  return [...groupedRows.entries()].map(([titolo, rows]) => ({
-    titolo,
-    sottoVarianti: rows.map((row) => ({
-      piattaforma: row.piattaforma.trim(),
-      edizioneVersione: row.edizioneVersione.trim(),
-      supporto: row.supporto.trim(),
-      stato: row.stato.trim(),
-    })),
-  }));
+  const titles = [...groupedRows.entries()].map(([titolo, sottoVarianti]) => ({ titolo, sottoVarianti }));
+  let groupedIndex = 0;
+  const sourceOrderChanged = titles.flatMap(({ sottoVarianti }) => sottoVarianti)
+    .some((variant) => variant.sourceRow !== groupedIndex++);
+  if (!sourceOrderChanged) {
+    for (const { sottoVarianti } of titles) {
+      for (const variant of sottoVarianti) delete variant.sourceRow;
+    }
+  }
+  return titles;
 }
 
 function buildStorageFromImportedTitles(storagePayload, titles, sourceName) {

@@ -1,9 +1,11 @@
 import {
+  exportActiveArchiveODS,
   importODSFile,
   loadDashboardPayload,
   resolvePendingImport,
   updateTitleRecord,
 } from "./storage.js";
+import { getVariantStatusColor } from "./ods-export.js";
 
 const state = {
   payload: null,
@@ -42,6 +44,11 @@ function formatTimestamp(timestamp) {
 
 function normalizeStatusLabel(statusValue) {
   return statusValue || "Stato mancante";
+}
+
+function renderStatusSwatch(variant) {
+  const color = variant && getVariantStatusColor(variant);
+  return color ? `<span class="status-swatch" style="--status-color: ${color}" aria-hidden="true"></span>` : "";
 }
 
 function presentFieldValue(value) {
@@ -240,6 +247,7 @@ function getTitlePrimaryStatus(title) {
     return {
       tone: "ok",
       label: "OK",
+      variant: title.sottoVarianti[statuses.indexOf("OK")],
     };
   }
 
@@ -257,12 +265,14 @@ function getTitlePrimaryStatus(title) {
     return {
       tone: "missing",
       label: statuses[0],
+      variant: title.sottoVarianti[0],
     };
   }
 
   return {
     tone: "warn",
     label: statuses[0],
+    variant: title.sottoVarianti[0],
   };
 }
 
@@ -496,7 +506,7 @@ function renderArchiveRoute(archive, params) {
                     title.sottoVarianti.length === 1 ? "variante" : "varianti"
                   }</span>
                   <span class="support-pill">${summary.platforms}</span>
-                  <span class="collection-pill collection-pill-${primaryStatus.tone}">${primaryStatus.label}</span>
+                  <span class="collection-pill collection-pill-${primaryStatus.tone}">${renderStatusSwatch(primaryStatus.variant)}${escapeHtmlAttribute(primaryStatus.label)}</span>
                 </div>
               </a>
             `;
@@ -615,7 +625,7 @@ function renderDetailRoute(archive, params) {
                 </div>
                 <div>
                   <dt>Stato</dt>
-                  <dd>${normalizeStatusLabel(variant.stato)}</dd>
+                  <dd class="variant-status">${renderStatusSwatch(variant)}${escapeHtmlAttribute(normalizeStatusLabel(variant.stato))}</dd>
                 </div>
               </dl>
             </article>
@@ -880,6 +890,90 @@ function renderImportRoute(archive) {
   };
 }
 
+const EXPORT_FILENAME = "archivio-1001.ods";
+
+function renderExportRoute(archive) {
+  const routeContent = document.querySelector("#route-content");
+
+  if (!archive.hasActiveArchive || !archive.activeTitles.length) {
+    routeContent.innerHTML = `
+      <div class="empty-state route-empty-state">
+        <img src="logo-32.png" width="32" height="32" alt="" />
+        <div>
+          <h3>Nessun archivio da esportare</h3>
+          <p>Importa un file ODS per attivare l’archivio locale.</p>
+        </div>
+        <a class="ghost-link" href="#/import">Importa ODS</a>
+      </div>
+    `;
+    return;
+  }
+
+  const numberFormat = new Intl.NumberFormat("it-IT");
+  const titleCount = archive.activeTitles.length;
+  const variantCount = archive.activeTitles.reduce((total, title) => total + title.sottoVarianti.length, 0);
+  routeContent.innerHTML = `
+    <div class="detail-header">
+      <div class="export-title-copy">
+        <h2>Esporta ODS</h2>
+        <p>Scarica una copia dell’intero archivio locale, anche senza connessione.</p>
+      </div>
+      <div class="detail-actions">
+        <a class="ghost-link" href="#/archive">Torna alla lista</a>
+      </div>
+    </div>
+    <section class="variant-card export-panel" aria-labelledby="export-filename">
+      <div class="export-file">
+        <span class="route-icon route-icon-export" aria-hidden="true"></span>
+        <h3 id="export-filename">${EXPORT_FILENAME}</h3>
+      </div>
+      <dl class="variant-grid export-summary">
+        <div>
+          <dt>Titoli</dt>
+          <dd>${numberFormat.format(titleCount)}</dd>
+        </div>
+        <div>
+          <dt>Sotto-varianti</dt>
+          <dd>${numberFormat.format(variantCount)}</dd>
+        </div>
+      </dl>
+      <p class="export-note">Lista conserva i colori e le celle unite del modello. Le formule in Risultati e Appoggio si ricalcolano nel foglio di calcolo.</p>
+      <div class="form-actions">
+        <button id="download-ods" type="button">Scarica ODS</button>
+      </div>
+      <p id="export-feedback" class="form-feedback" role="status"></p>
+    </section>
+  `;
+
+  const button = document.querySelector("#download-ods");
+  const feedback = document.querySelector("#export-feedback");
+  button.onclick = async () => {
+    button.disabled = true;
+    feedback.textContent = "Preparazione del file ODS…";
+
+    try {
+      const file = await exportActiveArchiveODS();
+      if (!button.isConnected) return;
+      const url = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = EXPORT_FILENAME;
+      try {
+        document.body.append(link);
+        link.click();
+      } finally {
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      }
+      feedback.textContent = "Download avviato.";
+    } catch {
+      feedback.textContent = "Non è stato possibile esportare l’archivio. Riprova.";
+    } finally {
+      button.disabled = false;
+    }
+  };
+}
+
 function renderFallbackRoute(appConfig, routeId) {
   const routeContent = document.querySelector("#route-content");
   const matchingRoute = appConfig.routes.find((route) => route.id === routeId);
@@ -933,6 +1027,11 @@ function renderRoute(appConfig, archive) {
 
   if (routeId === "import") {
     renderImportRoute(archive);
+    return;
+  }
+
+  if (routeId === "export") {
+    renderExportRoute(archive);
     return;
   }
 

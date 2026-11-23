@@ -1,10 +1,11 @@
-const CACHE_NAME = "archivio-1001-shell-v1";
+const CACHE_NAME = "archivio-1001-shell-v4";
 const SHELL_ASSETS = [
   "./",
   "index.html",
   "styles.css",
   "app.js",
   "storage.js",
+  "ods-export.js",
   "manifest.webmanifest",
   "logo-32.png",
   "icon-192.svg",

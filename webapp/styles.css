@@ -654,6 +654,26 @@ dd {
   border-color: rgba(255, 92, 115, 0.72);
 }
 
+.collection-pill,
+.variant-status {
+  gap: 0.35em;
+}
+
+.variant-status {
+  display: flex;
+  align-items: baseline;
+}
+
+.status-swatch {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 0.7em;
+  height: 0.7em;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 50%;
+  background-color: var(--status-color);
+}
+
 .top-nav-shell {
   position: fixed;
   right: 0;
@@ -751,12 +771,15 @@ dd {
   align-items: center;
 }
 
-.import-title-copy {
+.import-title-copy,
+.export-title-copy {
   display: grid;
   gap: 6px;
 }
 
-.import-title-copy p {
+.import-title-copy p,
+.export-note,
+.export-title-copy p {
   max-width: 34rem;
   margin: 0;
   color: var(--muted);
@@ -820,6 +843,26 @@ h3 {
 .form-feedback {
   margin: 0;
   color: var(--accent);
+}
+
+.export-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.export-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.export-panel .export-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.export-panel button:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .import-form-panel {
